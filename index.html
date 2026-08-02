@@ -430,6 +430,67 @@ button:focus-visible {
   border-color: var(--danger);
 }
 
+/* The Color panel step. .panel-review-banner is deliberately persistent, not
+   a dismissible toast -- the content it flags (Claude-drafted spectral
+   values) stays true for the lifetime of the page, so a one-time notice
+   would stop being accurate the moment it's dismissed. */
+.panel-review-banner {
+  font-size: 13px;
+  color: var(--warn);
+  background: var(--panel-2);
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+
+.panel-empty {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.panel-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.panel-state {
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.panel-row-text {
+  flex: 1 1 260px;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.panel-badge {
+  font-size: 11px;
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  border-radius: 6px;
+  padding: 2px 8px;
+  margin-left: auto;
+  cursor: default;
+}
+
 .describe-textarea {
   width: 100%;
   min-height: 120px;
@@ -1052,7 +1113,7 @@ button:focus-visible {
 <body>
 <div id="app"></div>
 <script>
-globalThis.__MICRONAUT_KB__ = {"advisor":{"rules":[{"body":"The depletion beam deposits far more energy per pixel than excitation alone, so a dye that looks bright on a confocal can bleach within a few STED frames. ATTO 647N and Abberior STAR dyes hold up; many Alexa dyes do not.","concept":"photobleaching","id":"sted-photostability","kind":"pitfall","priority":10,"surfaces":["describe","naming"],"title":"STED bleaches far faster than confocal -- pick dyes for photostability, not brightness","when":{"in":["acquisition.modality",["STED"]]}},{"body":"STED resolution is roughly 30-80 nm depending on depletion power and dye, well below a typical confocal pixel size. If the pixel size isn't set to Nyquist-sample that resolution, the extra resolution never reaches the data.","concept":"undersampling","id":"sted-pixel-nyquist","kind":"tip","priority":20,"surfaces":["design"],"title":"Undersampling throws away the resolution STED is buying you","when":{"in":["acquisition.modality",["STED"]]}},{"body":"A mismatched refractive index between the mounting medium and the objective's immersion oil introduces spherical aberration that visibly degrades STED resolution with depth. Use a high-RI, low-photobleaching mountant and a #1.5H coverslip with a high-NA oil objective.","concept":"spherical aberration","id":"sted-mounting","kind":"tip","priority":30,"surfaces":["describe"],"title":"Mounting medium and coverslip thickness matter more for STED than for confocal","when":{"in":["acquisition.modality",["STED"]]}},{"body":"The default pinhole size of 1 Airy Unit balances signal and out-of-focus light rejection. Opening it gathers more signal from a dim sample but lets in more out-of-focus blur, directly reducing your optical sectioning.","concept":"optical sectioning","id":"confocal-pinhole","kind":"tip","priority":10,"surfaces":["design"],"title":"Opening the pinhole trades optical sectioning for signal -- state it deliberately","when":{"in":["acquisition.modality",["confocal"]]}},{"body":"An undersampled pixel size throws away real optical resolution regardless of how good the objective is. The correct step size depends on numerical aperture and emission wavelength -- most acquisition software has a Nyquist calculator built in.","concept":"undersampling","id":"confocal-nyquist","kind":"tip","priority":20,"surfaces":["design"],"title":"Check your pixel size against Nyquist sampling before you commit to a design","when":{"in":["acquisition.modality",["confocal"]]}},{"body":"Simultaneous multi-laser scanning is faster but lets bleed-through between channels with overlapping emission masquerade as real colocalization. If your markers' emission spectra overlap, scan sequentially, one laser line at a time.","concept":"spectral spillover","id":"confocal-sequential-scanning","kind":"pitfall","priority":30,"surfaces":["design"],"title":"Overlapping emission spectra need sequential scanning, not simultaneous","when":{"in":["acquisition.modality",["confocal"]]}},{"body":"Out-of-focus light from every plane in the sample reaches the detector at once, since there is no pinhole to reject it. For anything much thicker than a monolayer, plan on deconvolution afterwards or switch to confocal or spinning-disk.","concept":"out-of-focus blur","id":"widefield-thick-sample-blur","kind":"pitfall","priority":10,"surfaces":["describe"],"title":"Widefield has no optical sectioning -- thick samples come out blurred","when":{"in":["acquisition.modality",["widefield"]]}},{"body":"Confocal's laser scanning delivers a much higher instantaneous light dose per pixel than widefield's wide-field illumination. For dim, photosensitive, or fast live-cell work, widefield's lower phototoxicity and higher frame rate can outperform confocal despite the missing optical sectioning.","concept":"phototoxicity","id":"widefield-live-cell-strength","kind":"tip","priority":20,"surfaces":["describe"],"title":"Widefield is often the RIGHT choice for dim or photosensitive live samples","when":{"in":["acquisition.modality",["widefield"]]}},{"body":"A mismatch between the sample, the mounting medium, and the chamber liquid shows up as visible smearing or striping in the data, not a subtle loss of quality. Confirm your clearing or mounting protocol actually matches the refractive index your instrument expects.","concept":"refractive-index mismatch","id":"lightsheet-refractive-index-matching","kind":"pitfall","priority":10,"surfaces":["describe"],"title":"Light-sheet imaging lives or dies on refractive-index matching","when":{"in":["acquisition.modality",["light-sheet"]]}},{"body":"Multi-view and multi-timepoint acquisition at light-sheet speeds generates data volumes that catch people off guard. Plan storage and downstream compute (registration, fusion, deconvolution) before the acquisition, not after the disk fills up.","concept":"data volume","id":"lightsheet-data-volume","kind":"tip","priority":20,"surfaces":["design"],"title":"Light-sheet datasets are routinely hundreds of GB to TB per sample","when":{"in":["acquisition.modality",["light-sheet"]]}},{"body":"Anything strongly absorbing or scattering in the light path (pigment, dense tissue, bubbles) casts a stripe artifact behind it when illuminated from one side. Dual-side illumination or pivot scanning removes most of it if your instrument supports either.","concept":"shadow striping","id":"lightsheet-shadow-stripes","kind":"tip","priority":30,"surfaces":["describe"],"title":"Single-sided illumination casts shadow stripes behind absorbing structures","when":{"in":["acquisition.modality",["light-sheet"]]}},{"body":"There is no fluorescence channel to name in electron microscopy. The MARKERS field is the right place for the contrast or staining agent instead -- uranyl acetate, osmium tetroxide, or immunogold, for example.","concept":"contrast agents","id":"em-markers-are-contrast-agents","kind":"tip","priority":10,"surfaces":["naming"],"title":"For SEM/TEM, MARKERS means contrast agents, not fluorophores","when":{"in":["acquisition.modality",["SEM","TEM"]]}},{"body":"Electron microscopy sample prep frequently produces one usable block or grid per condition rather than the parallel biological replicates a light-microscopy design assumes. Leave the replicate fields blank rather than forcing a count that doesn't reflect anything real.","concept":"replicate structure","id":"em-replicates-often-dont-apply","kind":"tip","priority":20,"surfaces":["design","naming"],"title":"SEM/TEM samples often don't have the usual biological/technical replicate structure","when":{"in":["acquisition.modality",["SEM","TEM"]]}},{"body":"SEM charging artifacts trace back to coating thickness and conductivity, and TEM contrast and resolution trace back to section thickness. Both are easy to forget to note once you're looking at finished micrographs -- record them while prepping, not after.","concept":"sample preparation","id":"em-prep-affects-image-quality","kind":"tip","priority":30,"surfaces":["describe"],"title":"Conductive coating and section thickness shape image quality as much as the microscope does","when":{"in":["acquisition.modality",["SEM","TEM"]]}},{"body":"There is no fluorophore panel to plan around, since Raman reads intrinsic vibrational signatures. In exchange, acquisition is slow -- seconds to minutes per spectrum or map point -- so scan area and point density become the real design tradeoff.","concept":"acquisition time","id":"raman-label-free-tradeoff","kind":"tip","priority":10,"surfaces":["describe"],"title":"Raman is label-free, but that speed cost shows up in acquisition time","when":{"in":["acquisition.modality",["Raman"]]}},{"body":"A stronger signal-to-noise ratio comes at the cost of local heating, which can damage biological or otherwise photosensitive material well before it's visibly obvious. Start at low power, check for damage, and only raise it once you've confirmed the sample tolerates it.","concept":"sample damage","id":"raman-laser-power-vs-damage","kind":"pitfall","priority":20,"surfaces":["design"],"title":"Higher Raman laser power improves signal but risks local heating and sample damage","when":{"in":["acquisition.modality",["Raman"]]}}],"version":1},"controls":{"rules":[{"id":"panel-unstained-control","kind":"panel","priority":10,"title":"Unstained / autofluorescence control","when":{"all":[{"exists":"naming.fields.markers"},{"ne":["naming.fields.markers","NONE"]}]},"why":"Fixed tissue and many cell types autofluoresce, especially in the green channel. Without an unstained sample imaged at the same settings, you cannot tell whether a dim signal is real stain or background autofluorescence."},{"id":"panel-single-stain-controls","kind":"panel","priority":20,"title":"Single-stain controls (one channel at a time)","when":{"all":[{"exists":"naming.fields.markers"},{"ne":["naming.fields.markers","NONE"]}]},"why":"When two or more fluorophores are imaged together, their emission spectra can overlap (spectral spillover/bleed-through). A sample stained with only ONE of the fluorophores, imaged on every channel, is what lets you tell real co-localization apart from spillover before you trust a multi-channel image."},{"id":"panel-secondary-only-control","kind":"panel","priority":30,"title":"Secondary-antibody-only control","when":{"all":[{"exists":"naming.fields.markers"},{"ne":["naming.fields.markers","NONE"]}]},"why":"For indirect immunofluorescence (primary antibody + fluorophore-conjugated secondary), the secondary can bind nonspecifically or the sample can autofluoresce at the secondary's wavelength. Omitting the primary but keeping the secondary isolates that background from real signal."},{"id":"panel-isotype-control","kind":"panel","priority":40,"title":"Isotype control","when":{"all":[{"exists":"naming.fields.markers"},{"ne":["naming.fields.markers","NONE"]}]},"why":"A primary antibody of the same host species and isotype but with no specificity for your target tests whether staining comes from genuine target binding or nonspecific antibody binding (e.g. Fc receptor binding)."},{"id":"viability-heat-killed-control","kind":"readout","priority":50,"title":"Heat-killed (dead) control","when":{"eq":["readout","bacterial-viability"]},"why":"SYTO9/PI viability staining reports percent-dead relative to a maximum-death reference. A heat-killed (or otherwise fully-killed) aliquot of the same culture, imaged the same way, calibrates the PI-positive gate -- without it, 'percent dead' has no anchor and drifts between imaging sessions."},{"id":"ros-positive-control","kind":"readout","priority":60,"title":"H2O2-treated positive control","when":{"eq":["readout","ros"]},"why":"A hydrogen-peroxide-treated sample gives DCF a known, strong oxidative signal, confirming the probe is loading and responding before you trust a subtler biological ROS increase."},{"id":"ros-negative-control","kind":"readout","priority":61,"title":"NAC-treated (antioxidant) negative control","when":{"eq":["readout","ros"]},"why":"N-acetylcysteine scavenges reactive oxygen species and should suppress the DCF signal. If it doesn't, the assay's readout may not actually be tracking oxidative stress in this experiment."},{"id":"cytoskeleton-untreated-reference","kind":"readout","priority":70,"title":"Untreated / vehicle reference","when":{"eq":["readout","macrophage-cytoskeleton"]},"why":"Phalloidin staining shows the actin architecture at a moment in time, which only means something in comparison to an untreated or vehicle-only baseline imaged under identical settings -- otherwise there is nothing to say the treated cytoskeleton changed."},{"id":"migration-baseline-reference","kind":"readout","priority":80,"title":"t=0 scratch reference image","when":{"eq":["readout","scratch-migration"]},"why":"Migration/closure is measured as a change in the wound area over time, so every scratch needs its own t=0 image taken immediately after scratching, before any of that area can already have started closing."},{"id":"migration-proliferation-control","kind":"readout","priority":81,"title":"Mitomycin C proliferation-blocked control","when":{"eq":["readout","scratch-migration"]},"why":"A scratch can close by cells migrating in OR by cells proliferating into the gap. Without a mitomycin-C-treated (proliferation-blocked) control closing more slowly, migration and proliferation are confounded and the assay cannot tell you which one you measured."}],"version":1},"markers":{"ambiguousInFreeText":["cerulean","citrine","clip","emerald","halo","snap","tomato","venus"],"markers":{"ALEXA405":{"aliases":["af405","alexa 405","alexa fluor 405","alexa405"],"class":"dye","freeTextAliases":["af405","alexa 405","alexa fluor 405","alexa405"],"isFamily":false,"variants":[]},"ALEXA430":{"aliases":["af430","alexa 430","alexa fluor 430","alexa430"],"class":"dye","freeTextAliases":["af430","alexa 430","alexa fluor 430","alexa430"],"isFamily":false,"variants":[]},"ALEXA488":{"aliases":["af488","alexa 488","alexa fluor 488","alexa488"],"class":"dye","freeTextAliases":["af488","alexa 488","alexa fluor 488","alexa488"],"isFamily":false,"variants":[]},"ALEXA514":{"aliases":["af514","alexa 514","alexa fluor 514","alexa514"],"class":"dye","freeTextAliases":["af514","alexa 514","alexa fluor 514","alexa514"],"isFamily":false,"variants":[]},"ALEXA532":{"aliases":["af532","alexa 532","alexa fluor 532","alexa532"],"class":"dye","freeTextAliases":["af532","alexa 532","alexa fluor 532","alexa532"],"isFamily":false,"variants":[]},"ALEXA546":{"aliases":["af546","alexa 546","alexa fluor 546","alexa546"],"class":"dye","freeTextAliases":["af546","alexa 546","alexa fluor 546","alexa546"],"isFamily":false,"variants":[]},"ALEXA555":{"aliases":["af555","alexa 555","alexa fluor 555","alexa555"],"class":"dye","freeTextAliases":["af555","alexa 555","alexa fluor 555","alexa555"],"isFamily":false,"variants":[]},"ALEXA568":{"aliases":["af568","alexa 568","alexa fluor 568","alexa568"],"class":"dye","freeTextAliases":["af568","alexa 568","alexa fluor 568","alexa568"],"isFamily":false,"variants":[]},"ALEXA594":{"aliases":["af594","alexa 594","alexa fluor 594","alexa594"],"class":"dye","freeTextAliases":["af594","alexa 594","alexa fluor 594","alexa594"],"isFamily":false,"variants":[]},"ALEXA647":{"aliases":["af647","alexa 647","alexa fluor 647","alexa647"],"class":"dye","freeTextAliases":["af647","alexa 647","alexa fluor 647","alexa647"],"isFamily":false,"variants":[]},"ALEXA660":{"aliases":["af660","alexa 660","alexa fluor 660","alexa660"],"class":"dye","freeTextAliases":["af660","alexa 660","alexa fluor 660","alexa660"],"isFamily":false,"variants":[]},"ALEXA680":{"aliases":["af680","alexa 680","alexa fluor 680","alexa680"],"class":"dye","freeTextAliases":["af680","alexa 680","alexa fluor 680","alexa680"],"isFamily":false,"variants":[]},"ALEXA750":{"aliases":["af750","alexa 750","alexa fluor 750","alexa750"],"class":"dye","freeTextAliases":["af750","alexa 750","alexa fluor 750","alexa750"],"isFamily":false,"variants":[]},"ARL":{"aliases":["arl"],"class":"dye","freeTextAliases":["arl"],"isFamily":false,"variants":[]},"ATTO425":{"aliases":["atto 425","atto425"],"class":"dye","freeTextAliases":["atto 425","atto425"],"isFamily":false,"variants":[]},"ATTO488":{"aliases":["atto 488","atto488"],"class":"dye","freeTextAliases":["atto 488","atto488"],"isFamily":false,"variants":[]},"ATTO520":{"aliases":["atto 520","atto520"],"class":"dye","freeTextAliases":["atto 520","atto520"],"isFamily":false,"variants":[]},"ATTO550":{"aliases":["atto 550","atto550"],"class":"dye","freeTextAliases":["atto 550","atto550"],"isFamily":false,"variants":[]},"ATTO565":{"aliases":["atto 565","atto565"],"class":"dye","freeTextAliases":["atto 565","atto565"],"isFamily":false,"variants":[]},"ATTO590":{"aliases":["atto 590","atto590"],"class":"dye","freeTextAliases":["atto 590","atto590"],"isFamily":false,"variants":[]},"ATTO633":{"aliases":["atto 633","atto633"],"class":"dye","freeTextAliases":["atto 633","atto633"],"isFamily":false,"variants":[]},"ATTO647":{"aliases":["atto 647","atto647"],"class":"dye","freeTextAliases":["atto 647","atto647"],"isFamily":false,"variants":[]},"ATTO647N":{"aliases":["atto 647-n","atto 647n","atto647-n","atto647n"],"class":"dye","freeTextAliases":["atto 647-n","atto 647n","atto647-n","atto647n"],"isFamily":false,"variants":[]},"ATTO700":{"aliases":["atto 700","atto700"],"class":"dye","freeTextAliases":["atto 700","atto700"],"isFamily":false,"variants":[]},"BFP":{"aliases":["bfp"],"class":"protein","freeTextAliases":["bfp"],"isFamily":false,"variants":[]},"BODIPY":{"aliases":["bodipy"],"class":"dye","freeTextAliases":["bodipy"],"isFamily":true,"variants":[]},"CALCEIN":{"aliases":["calcein","calcein am","calcein-am"],"class":"dye","freeTextAliases":["calcein","calcein am","calcein-am"],"isFamily":false,"variants":[]},"CELLMASK":{"aliases":["cell mask","cellmask"],"class":"dye","freeTextAliases":["cell mask","cellmask"],"isFamily":false,"variants":[]},"CERULEAN":{"aliases":["cerulean"],"class":"protein","freeTextAliases":[],"isFamily":false,"variants":[]},"CFP":{"aliases":["cfp"],"class":"protein","freeTextAliases":["cfp"],"isFamily":false,"variants":[]},"CITRINE":{"aliases":["citrine"],"class":"protein","freeTextAliases":[],"isFamily":false,"variants":[]},"CLIP":{"aliases":["clip","clip tag","clip-tag","cliptag"],"class":"tag","freeTextAliases":["clip tag","clip-tag","cliptag"],"isFamily":false,"variants":[]},"CY2":{"aliases":["cy2","cyanine2"],"class":"dye","freeTextAliases":["cy2","cyanine2"],"isFamily":false,"variants":[]},"CY3":{"aliases":["cy3","cyanine3"],"class":"dye","freeTextAliases":["cy3","cyanine3"],"isFamily":false,"variants":[]},"CY5":{"aliases":["cy5","cyanine5"],"class":"dye","freeTextAliases":["cy5","cyanine5"],"isFamily":false,"variants":[]},"CY7":{"aliases":["cy7","cyanine7"],"class":"dye","freeTextAliases":["cy7","cyanine7"],"isFamily":false,"variants":[]},"DAPI":{"aliases":["dapi"],"class":"dye","freeTextAliases":["dapi"],"isFamily":false,"variants":[]},"DRAQ5":{"aliases":["draq 5","draq5"],"class":"dye","freeTextAliases":["draq 5","draq5"],"isFamily":false,"variants":[]},"DYLIGHT488":{"aliases":["dylight 488","dylight488"],"class":"dye","freeTextAliases":["dylight 488","dylight488"],"isFamily":false,"variants":[]},"DYLIGHT550":{"aliases":["dylight 550","dylight550"],"class":"dye","freeTextAliases":["dylight 550","dylight550"],"isFamily":false,"variants":[]},"DYLIGHT650":{"aliases":["dylight 650","dylight650"],"class":"dye","freeTextAliases":["dylight 650","dylight650"],"isFamily":false,"variants":[]},"ERTRACKER":{"aliases":["er tracker","er-tracker","ertracker"],"class":"dye","freeTextAliases":["er tracker","er-tracker","ertracker"],"isFamily":false,"variants":[]},"FITC":{"aliases":["fitc"],"class":"dye","freeTextAliases":["fitc"],"isFamily":false,"variants":[]},"FLUO4":{"aliases":["fluo 4","fluo-4","fluo4"],"class":"indicator","freeTextAliases":["fluo 4","fluo-4","fluo4"],"isFamily":false,"variants":[]},"FURA2":{"aliases":["fura 2","fura-2","fura2"],"class":"indicator","freeTextAliases":["fura 2","fura-2","fura2"],"isFamily":false,"variants":[]},"GCAMP":{"aliases":["gcamp","gcamp3","gcamp5","gcamp6","gcamp6f","gcamp6m","gcamp6s","gcamp7","gcamp7f","gcamp7s"],"class":"indicator","freeTextAliases":["gcamp","gcamp3","gcamp5","gcamp6","gcamp6f","gcamp6m","gcamp6s","gcamp7","gcamp7f","gcamp7s"],"isFamily":true,"variants":["gcamp3","gcamp5","gcamp6","gcamp6f","gcamp6m","gcamp6s","gcamp7","gcamp7f","gcamp7s"]},"GFP":{"aliases":["egfp","gfp","gfp+"],"class":"protein","freeTextAliases":["egfp","gfp","gfp+"],"isFamily":false,"variants":[]},"HALO":{"aliases":["halo","halo tag","halo-tag","halotag"],"class":"tag","freeTextAliases":["halo tag","halo-tag","halotag"],"isFamily":false,"variants":[]},"HOECHST":{"aliases":["hoechst","hoechst 33258","hoechst 33342","hoechst33258","hoechst33342"],"class":"dye","freeTextAliases":["hoechst","hoechst 33258","hoechst 33342","hoechst33258","hoechst33342"],"isFamily":false,"variants":[]},"IRFP":{"aliases":["irfp"],"class":"protein","freeTextAliases":["irfp"],"isFamily":false,"variants":[]},"JF549":{"aliases":["janelia fluor 549","jf 549","jf549"],"class":"dye","freeTextAliases":["janelia fluor 549","jf 549","jf549"],"isFamily":false,"variants":[]},"JF646":{"aliases":["janelia fluor 646","jf 646","jf646"],"class":"dye","freeTextAliases":["janelia fluor 646","jf 646","jf646"],"isFamily":false,"variants":[]},"LYSOTRACKER":{"aliases":["lyso tracker","lysotracker","lysotracker green","lysotracker red"],"class":"dye","freeTextAliases":["lyso tracker","lysotracker","lysotracker green","lysotracker red"],"isFamily":true,"variants":["lysotracker green","lysotracker red"]},"MCHERRY":{"aliases":["mcherry"],"class":"protein","freeTextAliases":["mcherry"],"isFamily":false,"variants":[]},"MEMERALD":{"aliases":["emerald","memerald"],"class":"protein","freeTextAliases":["memerald"],"isFamily":false,"variants":[]},"MIRFP":{"aliases":["mirfp"],"class":"protein","freeTextAliases":["mirfp"],"isFamily":false,"variants":[]},"MITOTRACKER":{"aliases":["mito tracker","mitotracker","mitotracker deep red","mitotracker green","mitotracker orange","mitotracker red"],"class":"dye","freeTextAliases":["mito tracker","mitotracker","mitotracker deep red","mitotracker green","mitotracker orange","mitotracker red"],"isFamily":true,"variants":["mitotracker deep red","mitotracker green","mitotracker orange","mitotracker red"]},"MNEONGREEN":{"aliases":["mneongreen","neongreen"],"class":"protein","freeTextAliases":["mneongreen","neongreen"],"isFamily":false,"variants":[]},"MRUBY":{"aliases":["mruby"],"class":"protein","freeTextAliases":["mruby"],"isFamily":false,"variants":[]},"MSCARLET":{"aliases":["mscarlet"],"class":"protein","freeTextAliases":["mscarlet"],"isFamily":false,"variants":[]},"MTURQUOISE":{"aliases":["mturquoise"],"class":"protein","freeTextAliases":["mturquoise"],"isFamily":false,"variants":[]},"PHALLOIDIN":{"aliases":["phalloidin"],"class":"moiety","freeTextAliases":["phalloidin"],"isFamily":false,"variants":[]},"PROPIDIUMIODIDE":{"aliases":["propidium iodide","propidiumiodide"],"class":"dye","freeTextAliases":["propidium iodide","propidiumiodide"],"isFamily":false,"variants":[]},"RFP":{"aliases":["rfp"],"class":"protein","freeTextAliases":["rfp"],"isFamily":false,"variants":[]},"SIRACTIN":{"aliases":["sir actin","sir-actin","siractin"],"class":"dye","freeTextAliases":["sir actin","sir-actin","siractin"],"isFamily":false,"variants":[]},"SIRTUBULIN":{"aliases":["sir tubulin","sir-tubulin","sirtubulin"],"class":"dye","freeTextAliases":["sir tubulin","sir-tubulin","sirtubulin"],"isFamily":false,"variants":[]},"SNAP":{"aliases":["snap","snap tag","snap-tag","snaptag"],"class":"tag","freeTextAliases":["snap tag","snap-tag","snaptag"],"isFamily":false,"variants":[]},"SOX":{"aliases":["sox"],"class":"dye","freeTextAliases":["sox"],"isFamily":false,"variants":[]},"SOX2":{"aliases":["sox2"],"class":"dye","freeTextAliases":["sox2"],"isFamily":false,"variants":[]},"SYTOX":{"aliases":["sytox","sytox blue","sytox green","sytox orange","sytox red"],"class":"dye","freeTextAliases":["sytox","sytox blue","sytox green","sytox orange","sytox red"],"isFamily":true,"variants":["sytox blue","sytox green","sytox orange","sytox red"]},"TDTOMATO":{"aliases":["td-tomato","tdtomato","tomato"],"class":"protein","freeTextAliases":["td-tomato","tdtomato"],"isFamily":false,"variants":[]},"TEXASRED":{"aliases":["texas red","texas-red","texasred"],"class":"dye","freeTextAliases":["texas red","texas-red","texasred"],"isFamily":false,"variants":[]},"TRITC":{"aliases":["tritc"],"class":"dye","freeTextAliases":["tritc"],"isFamily":false,"variants":[]},"VENUS":{"aliases":["venus"],"class":"protein","freeTextAliases":[],"isFamily":false,"variants":[]},"WGA":{"aliases":["wga"],"class":"moiety","freeTextAliases":["wga"],"isFamily":false,"variants":[]},"YFP":{"aliases":["yfp"],"class":"protein","freeTextAliases":["yfp"],"isFamily":false,"variants":[]}},"version":1},"questions":[{"field":"naming.fields.date","id":"date","priority":10,"prompt":"When was this acquired?","tag":"user","type":"text","why":"The date is the first token in every filename this tool renders, and sorts your files chronologically without you having to name them that way."},{"field":"naming.fields.exptype","id":"exptype","priority":20,"prompt":"What kind of experiment is this?","tag":"user","type":"text","why":"The experiment type groups related acquisitions together in a folder listing (e.g. CT for a control, G1G2 for a two-generation comparison)."},{"field":"naming.fields.sample","id":"sample","priority":30,"prompt":"What's the sample or specimen identifier?","tag":"user","type":"text","why":"This is what tells two files with the same date and experiment type apart -- it should be unique within that experiment."},{"field":"naming.fields.magnification","id":"magnification","priority":40,"prompt":"What magnification or objective was used?","tag":"user","type":"text","why":"Filtering by magnification later (e.g. finding every 63x acquisition) only works if it's in the filename."},{"field":"naming.fields.markers","id":"markers","priority":50,"prompt":"Which markers or fluorophores were imaged?","tag":"user","type":"text","why":"Markers are the main thing collaborators search filenames for -- worth getting into the name even if it's also in the metadata."},{"field":"specimen.organism","id":"organism","priority":60,"prompt":"What organism or cell line is this?","tag":"user","type":"text","why":"Groups this experiment with others on the same model system when you're searching later."},{"field":"specimen.sampleType","id":"sampleType","priority":70,"prompt":"What type of sample is it (e.g. tissue section, cell culture, whole mount)?","tag":"user","type":"text","why":"Sample type changes what acquisition settings and controls are typical -- later steps use this to tailor their suggestions."},{"askWhen":{"exists":"specimen.organism"},"field":"specimen.preparation","id":"preparation","priority":80,"prompt":"How was the sample prepared?","tag":"user","type":"text","why":"Fixation and mounting method affects which controls and settings make sense, and is easy to forget by the time you write the paper."},{"field":"acquisition.instrument","id":"instrument","priority":90,"prompt":"Which instrument did you use?","tag":"user","type":"text","why":"Ties this experiment to the instrument's known objectives, lasers, and detectors for later acquisition guidance."},{"allowOther":true,"field":"acquisition.modality","id":"modality","options":["confocal","widefield","STED","light-sheet","SEM","TEM","Raman"],"priority":100,"prompt":"What imaging modality is this?","tag":"user","type":"choice","why":"Modality drives modality-specific guidance later -- confocal, widefield and STED have different pitfalls worth flagging. Not every modality is optical: SEM/TEM/Raman samples typically have no biological or technical replicates in the usual sense, which is why those are separate, independently-optional questions."},{"allowOther":true,"field":"readoutText","id":"readout","options":["Bacterial viability","Macrophage cytoskeleton","Intracellular ROS","Scratch / migration"],"priority":15,"prompt":"What is this assay's readout?","tag":"user","type":"choice","why":"The readout drives the control guidance on the study overview -- a viability assay, a ROS assay, and a migration assay each need a different reference control, and the app can only suggest the right ones once it knows which you're running."},{"field":"design.biologicalReplicates","id":"biologicalReplicates","priority":110,"prompt":"How many biological replicates?","tag":"user","type":"number","why":"Determines how many condition rows the design expands into and whether the sample size is worth flagging as low."},{"field":"design.technicalReplicates","id":"technicalReplicates","priority":111,"prompt":"How many technical replicates per biological replicate, if any?","tag":"user","type":"number","why":"Technical replicates (repeat acquisitions of the same biological sample) get their own token in the filename, separate from biological replicates -- leave this blank if you didn't take any."},{"field":"naming.fields.notes","id":"notes","priority":120,"prompt":"Anything else worth noting about this acquisition?","tag":"user","type":"text","why":"A free-text escape hatch for anything the other questions didn't capture -- entirely optional."}],"readouts":{"readouts":{"bacterial-viability":{"aliases":["viability","live/dead","live dead","syto9","syto9/pi","syto9-pi"],"label":"Bacterial viability"},"macrophage-cytoskeleton":{"aliases":["cytoskeleton","phalloidin","actin","f-actin"],"label":"Macrophage cytoskeleton"},"ros":{"aliases":["reactive oxygen species","oxidative stress","dcf","dcfda","dcf-da"],"label":"Intracellular ROS"},"scratch-migration":{"aliases":["wound healing","wound-healing","migration","scratch assay","scratch"],"label":"Scratch / migration"}},"version":1},"stages":{"rules":[{"id":"pilot-sted-on-confocal-first","note":"STED sessions are slower, more bleach-prone, and typically shared-instrument time -- pilot your staining, dye choice, and mounting on a confocal first, then move to STED only once the biology and the sample prep are already validated.","priority":10,"stage":"pilot","when":{"eq":["acquisition.modality","STED"]}},{"id":"pilot-light-sheet-mounting","note":"Light-sheet imaging usually requires specific sample mounting or clearing that a standard confocal prep does not need -- confirm your mounting protocol is compatible before the first real light-sheet session, ideally by checking it under a confocal first.","priority":10,"stage":"pilot","when":{"eq":["acquisition.modality","light-sheet"]}},{"id":"pilot-em-fixation-irreversible","note":"EM fixation and processing are destructive and irreversible -- a failed fixation protocol destroys the sample it was tested on. Pilot the fixation protocol on a spare or lower-value sample, and confirm the biology looks right under light microscopy first, before committing your real samples to EM processing.","priority":10,"stage":"pilot","when":{"in":["acquisition.modality",["SEM","TEM"]]}},{"id":"validate-viability-heat-killed-first","note":"Before imaging the full sample set, confirm the heat-killed control actually reads as fully PI-positive at your chosen settings -- if it doesn't, the viability gate is miscalibrated and every subsequent sample's percent-dead is unreliable.","priority":20,"stage":"validate-controls","when":{"eq":["readout","bacterial-viability"]}},{"id":"validate-migration-mitomycin-first","note":"Confirm the mitomycin-C-treated control actually shows slower closure than the untreated scratch in your pilot -- if it doesn't block proliferation as expected at your chosen dose, migration and proliferation stay confounded in the full study too.","priority":20,"stage":"validate-controls","when":{"eq":["readout","scratch-migration"]}},{"id":"acquisition-ros-photobleaching-budget","note":"ROS-sensitive probes like DCF are photolabile, and the excitation light itself can generate additional ROS -- fix laser power and exposure to the lowest setting that gives usable signal in the pilot, and use identical settings for every sample so the readout reflects biology, not variable photo-induced signal.","priority":20,"stage":"acquisition-settings","when":{"eq":["readout","ros"]}}],"stages":[{"body":"State the research question in one sentence, name the readout you are actually measuring (viability, cytoskeleton, ROS, migration -- whatever it is for this assay), and identify one modality you could reasonably run tomorrow, on equipment you already have access to. Everything below builds on committing to those three things first.","id":"idea","order":10,"title":"Idea & feasibility"},{"body":"Run a small pilot (n=1-2) on the cheapest, simplest microscope that can plausibly answer the question, before booking time on an advanced or shared instrument. A pilot's job is to catch a broken protocol or a wrong assumption while it is still cheap to fix.","id":"pilot","order":20,"title":"Pilot on the simplest sufficient scope"},{"body":"Run every control this assay needs (see the Controls section above) on the pilot samples, and confirm each one behaves as expected -- a heat-killed control should read as dead, an isotype control should read as background -- before spending time imaging the full sample set. A control that fails to behave as expected invalidates every sample imaged before it is fixed.","id":"validate-controls","order":30,"title":"Validate your controls"},{"body":"Lock exposure, gain, laser power, and pinhole size from the pilot data, then keep them fixed for every subsequent acquisition -- changing settings mid-study makes samples incomparable. Use the pilot's own variance to judge whether the planned number of biological replicates is enough to see the effect you are looking for, before committing to the full n.","id":"acquisition-settings","order":40,"title":"Fix acquisition settings & power the design"},{"body":"Once the pilot, the controls, and the acquisition settings are all locked, move to the advanced or specialized modality the study actually calls for (STED, light-sheet, EM) if one is needed -- not before, since advanced-instrument time is the most expensive place to discover a protocol problem.","id":"advanced-modality","order":50,"title":"Move to advanced or specialized microscopy"}],"version":1}};
+globalThis.__MICRONAUT_KB__ = {"advisor":{"rules":[{"body":"The depletion beam deposits far more energy per pixel than excitation alone, so a dye that looks bright on a confocal can bleach within a few STED frames. ATTO 647N and Abberior STAR dyes hold up; many Alexa dyes do not.","concept":"photobleaching","id":"sted-photostability","kind":"pitfall","priority":10,"surfaces":["describe","naming"],"title":"STED bleaches far faster than confocal -- pick dyes for photostability, not brightness","when":{"in":["acquisition.modality",["STED"]]}},{"body":"STED resolution is roughly 30-80 nm depending on depletion power and dye, well below a typical confocal pixel size. If the pixel size isn't set to Nyquist-sample that resolution, the extra resolution never reaches the data.","concept":"undersampling","id":"sted-pixel-nyquist","kind":"tip","priority":20,"surfaces":["design"],"title":"Undersampling throws away the resolution STED is buying you","when":{"in":["acquisition.modality",["STED"]]}},{"body":"A mismatched refractive index between the mounting medium and the objective's immersion oil introduces spherical aberration that visibly degrades STED resolution with depth. Use a high-RI, low-photobleaching mountant and a #1.5H coverslip with a high-NA oil objective.","concept":"spherical aberration","id":"sted-mounting","kind":"tip","priority":30,"surfaces":["describe"],"title":"Mounting medium and coverslip thickness matter more for STED than for confocal","when":{"in":["acquisition.modality",["STED"]]}},{"body":"The default pinhole size of 1 Airy Unit balances signal and out-of-focus light rejection. Opening it gathers more signal from a dim sample but lets in more out-of-focus blur, directly reducing your optical sectioning.","concept":"optical sectioning","id":"confocal-pinhole","kind":"tip","priority":10,"surfaces":["design"],"title":"Opening the pinhole trades optical sectioning for signal -- state it deliberately","when":{"in":["acquisition.modality",["confocal"]]}},{"body":"An undersampled pixel size throws away real optical resolution regardless of how good the objective is. The correct step size depends on numerical aperture and emission wavelength -- most acquisition software has a Nyquist calculator built in.","concept":"undersampling","id":"confocal-nyquist","kind":"tip","priority":20,"surfaces":["design"],"title":"Check your pixel size against Nyquist sampling before you commit to a design","when":{"in":["acquisition.modality",["confocal"]]}},{"body":"Simultaneous multi-laser scanning is faster but lets bleed-through between channels with overlapping emission masquerade as real colocalization. If your markers' emission spectra overlap, scan sequentially, one laser line at a time.","concept":"spectral spillover","id":"confocal-sequential-scanning","kind":"pitfall","priority":30,"surfaces":["design","panel"],"title":"Overlapping emission spectra need sequential scanning, not simultaneous","when":{"in":["acquisition.modality",["confocal"]]}},{"body":"Out-of-focus light from every plane in the sample reaches the detector at once, since there is no pinhole to reject it. For anything much thicker than a monolayer, plan on deconvolution afterwards or switch to confocal or spinning-disk.","concept":"out-of-focus blur","id":"widefield-thick-sample-blur","kind":"pitfall","priority":10,"surfaces":["describe"],"title":"Widefield has no optical sectioning -- thick samples come out blurred","when":{"in":["acquisition.modality",["widefield"]]}},{"body":"Confocal's laser scanning delivers a much higher instantaneous light dose per pixel than widefield's wide-field illumination. For dim, photosensitive, or fast live-cell work, widefield's lower phototoxicity and higher frame rate can outperform confocal despite the missing optical sectioning.","concept":"phototoxicity","id":"widefield-live-cell-strength","kind":"tip","priority":20,"surfaces":["describe"],"title":"Widefield is often the RIGHT choice for dim or photosensitive live samples","when":{"in":["acquisition.modality",["widefield"]]}},{"body":"A mismatch between the sample, the mounting medium, and the chamber liquid shows up as visible smearing or striping in the data, not a subtle loss of quality. Confirm your clearing or mounting protocol actually matches the refractive index your instrument expects.","concept":"refractive-index mismatch","id":"lightsheet-refractive-index-matching","kind":"pitfall","priority":10,"surfaces":["describe"],"title":"Light-sheet imaging lives or dies on refractive-index matching","when":{"in":["acquisition.modality",["light-sheet"]]}},{"body":"Multi-view and multi-timepoint acquisition at light-sheet speeds generates data volumes that catch people off guard. Plan storage and downstream compute (registration, fusion, deconvolution) before the acquisition, not after the disk fills up.","concept":"data volume","id":"lightsheet-data-volume","kind":"tip","priority":20,"surfaces":["design"],"title":"Light-sheet datasets are routinely hundreds of GB to TB per sample","when":{"in":["acquisition.modality",["light-sheet"]]}},{"body":"Anything strongly absorbing or scattering in the light path (pigment, dense tissue, bubbles) casts a stripe artifact behind it when illuminated from one side. Dual-side illumination or pivot scanning removes most of it if your instrument supports either.","concept":"shadow striping","id":"lightsheet-shadow-stripes","kind":"tip","priority":30,"surfaces":["describe"],"title":"Single-sided illumination casts shadow stripes behind absorbing structures","when":{"in":["acquisition.modality",["light-sheet"]]}},{"body":"There is no fluorescence channel to name in electron microscopy. The MARKERS field is the right place for the contrast or staining agent instead -- uranyl acetate, osmium tetroxide, or immunogold, for example.","concept":"contrast agents","id":"em-markers-are-contrast-agents","kind":"tip","priority":10,"surfaces":["naming"],"title":"For SEM/TEM, MARKERS means contrast agents, not fluorophores","when":{"in":["acquisition.modality",["SEM","TEM"]]}},{"body":"Electron microscopy sample prep frequently produces one usable block or grid per condition rather than the parallel biological replicates a light-microscopy design assumes. Leave the replicate fields blank rather than forcing a count that doesn't reflect anything real.","concept":"replicate structure","id":"em-replicates-often-dont-apply","kind":"tip","priority":20,"surfaces":["design","naming"],"title":"SEM/TEM samples often don't have the usual biological/technical replicate structure","when":{"in":["acquisition.modality",["SEM","TEM"]]}},{"body":"SEM charging artifacts trace back to coating thickness and conductivity, and TEM contrast and resolution trace back to section thickness. Both are easy to forget to note once you're looking at finished micrographs -- record them while prepping, not after.","concept":"sample preparation","id":"em-prep-affects-image-quality","kind":"tip","priority":30,"surfaces":["describe"],"title":"Conductive coating and section thickness shape image quality as much as the microscope does","when":{"in":["acquisition.modality",["SEM","TEM"]]}},{"body":"There is no fluorophore panel to plan around, since Raman reads intrinsic vibrational signatures. In exchange, acquisition is slow -- seconds to minutes per spectrum or map point -- so scan area and point density become the real design tradeoff.","concept":"acquisition time","id":"raman-label-free-tradeoff","kind":"tip","priority":10,"surfaces":["describe"],"title":"Raman is label-free, but that speed cost shows up in acquisition time","when":{"in":["acquisition.modality",["Raman"]]}},{"body":"A stronger signal-to-noise ratio comes at the cost of local heating, which can damage biological or otherwise photosensitive material well before it's visibly obvious. Start at low power, check for damage, and only raise it once you've confirmed the sample tolerates it.","concept":"sample damage","id":"raman-laser-power-vs-damage","kind":"pitfall","priority":20,"surfaces":["design"],"title":"Higher Raman laser power improves signal but risks local heating and sample damage","when":{"in":["acquisition.modality",["Raman"]]}}],"version":1},"controls":{"rules":[{"id":"panel-unstained-control","kind":"panel","priority":10,"title":"Unstained / autofluorescence control","when":{"all":[{"exists":"naming.fields.markers"},{"ne":["naming.fields.markers","NONE"]}]},"why":"Fixed tissue and many cell types autofluoresce, especially in the green channel. Without an unstained sample imaged at the same settings, you cannot tell whether a dim signal is real stain or background autofluorescence."},{"id":"panel-single-stain-controls","kind":"panel","priority":20,"title":"Single-stain controls (one channel at a time)","when":{"all":[{"exists":"naming.fields.markers"},{"ne":["naming.fields.markers","NONE"]}]},"why":"When two or more fluorophores are imaged together, their emission spectra can overlap (spectral spillover/bleed-through). A sample stained with only ONE of the fluorophores, imaged on every channel, is what lets you tell real co-localization apart from spillover before you trust a multi-channel image."},{"id":"panel-secondary-only-control","kind":"panel","priority":30,"title":"Secondary-antibody-only control","when":{"all":[{"exists":"naming.fields.markers"},{"ne":["naming.fields.markers","NONE"]}]},"why":"For indirect immunofluorescence (primary antibody + fluorophore-conjugated secondary), the secondary can bind nonspecifically or the sample can autofluoresce at the secondary's wavelength. Omitting the primary but keeping the secondary isolates that background from real signal."},{"id":"panel-isotype-control","kind":"panel","priority":40,"title":"Isotype control","when":{"all":[{"exists":"naming.fields.markers"},{"ne":["naming.fields.markers","NONE"]}]},"why":"A primary antibody of the same host species and isotype but with no specificity for your target tests whether staining comes from genuine target binding or nonspecific antibody binding (e.g. Fc receptor binding)."},{"id":"viability-heat-killed-control","kind":"readout","priority":50,"title":"Heat-killed (dead) control","when":{"eq":["readout","bacterial-viability"]},"why":"SYTO9/PI viability staining reports percent-dead relative to a maximum-death reference. A heat-killed (or otherwise fully-killed) aliquot of the same culture, imaged the same way, calibrates the PI-positive gate -- without it, 'percent dead' has no anchor and drifts between imaging sessions."},{"id":"ros-positive-control","kind":"readout","priority":60,"title":"H2O2-treated positive control","when":{"eq":["readout","ros"]},"why":"A hydrogen-peroxide-treated sample gives DCF a known, strong oxidative signal, confirming the probe is loading and responding before you trust a subtler biological ROS increase."},{"id":"ros-negative-control","kind":"readout","priority":61,"title":"NAC-treated (antioxidant) negative control","when":{"eq":["readout","ros"]},"why":"N-acetylcysteine scavenges reactive oxygen species and should suppress the DCF signal. If it doesn't, the assay's readout may not actually be tracking oxidative stress in this experiment."},{"id":"cytoskeleton-untreated-reference","kind":"readout","priority":70,"title":"Untreated / vehicle reference","when":{"eq":["readout","macrophage-cytoskeleton"]},"why":"Phalloidin staining shows the actin architecture at a moment in time, which only means something in comparison to an untreated or vehicle-only baseline imaged under identical settings -- otherwise there is nothing to say the treated cytoskeleton changed."},{"id":"migration-baseline-reference","kind":"readout","priority":80,"title":"t=0 scratch reference image","when":{"eq":["readout","scratch-migration"]},"why":"Migration/closure is measured as a change in the wound area over time, so every scratch needs its own t=0 image taken immediately after scratching, before any of that area can already have started closing."},{"id":"migration-proliferation-control","kind":"readout","priority":81,"title":"Mitomycin C proliferation-blocked control","when":{"eq":["readout","scratch-migration"]},"why":"A scratch can close by cells migrating in OR by cells proliferating into the gap. Without a mitomycin-C-treated (proliferation-blocked) control closing more slowly, migration and proliferation are confounded and the assay cannot tell you which one you measured."}],"version":1},"markers":{"ambiguousInFreeText":["cerulean","citrine","clip","emerald","halo","snap","tomato","venus"],"markers":{"ALEXA405":{"aliases":["af405","alexa 405","alexa fluor 405","alexa405"],"class":"dye","freeTextAliases":["af405","alexa 405","alexa fluor 405","alexa405"],"isFamily":false,"variants":[]},"ALEXA430":{"aliases":["af430","alexa 430","alexa fluor 430","alexa430"],"class":"dye","freeTextAliases":["af430","alexa 430","alexa fluor 430","alexa430"],"isFamily":false,"variants":[]},"ALEXA488":{"aliases":["af488","alexa 488","alexa fluor 488","alexa488"],"class":"dye","freeTextAliases":["af488","alexa 488","alexa fluor 488","alexa488"],"isFamily":false,"variants":[]},"ALEXA514":{"aliases":["af514","alexa 514","alexa fluor 514","alexa514"],"class":"dye","freeTextAliases":["af514","alexa 514","alexa fluor 514","alexa514"],"isFamily":false,"variants":[]},"ALEXA532":{"aliases":["af532","alexa 532","alexa fluor 532","alexa532"],"class":"dye","freeTextAliases":["af532","alexa 532","alexa fluor 532","alexa532"],"isFamily":false,"variants":[]},"ALEXA546":{"aliases":["af546","alexa 546","alexa fluor 546","alexa546"],"class":"dye","freeTextAliases":["af546","alexa 546","alexa fluor 546","alexa546"],"isFamily":false,"variants":[]},"ALEXA555":{"aliases":["af555","alexa 555","alexa fluor 555","alexa555"],"class":"dye","freeTextAliases":["af555","alexa 555","alexa fluor 555","alexa555"],"isFamily":false,"variants":[]},"ALEXA568":{"aliases":["af568","alexa 568","alexa fluor 568","alexa568"],"class":"dye","freeTextAliases":["af568","alexa 568","alexa fluor 568","alexa568"],"isFamily":false,"variants":[]},"ALEXA594":{"aliases":["af594","alexa 594","alexa fluor 594","alexa594"],"class":"dye","freeTextAliases":["af594","alexa 594","alexa fluor 594","alexa594"],"isFamily":false,"variants":[]},"ALEXA647":{"aliases":["af647","alexa 647","alexa fluor 647","alexa647"],"class":"dye","freeTextAliases":["af647","alexa 647","alexa fluor 647","alexa647"],"isFamily":false,"variants":[]},"ALEXA660":{"aliases":["af660","alexa 660","alexa fluor 660","alexa660"],"class":"dye","freeTextAliases":["af660","alexa 660","alexa fluor 660","alexa660"],"isFamily":false,"variants":[]},"ALEXA680":{"aliases":["af680","alexa 680","alexa fluor 680","alexa680"],"class":"dye","freeTextAliases":["af680","alexa 680","alexa fluor 680","alexa680"],"isFamily":false,"variants":[]},"ALEXA750":{"aliases":["af750","alexa 750","alexa fluor 750","alexa750"],"class":"dye","freeTextAliases":["af750","alexa 750","alexa fluor 750","alexa750"],"isFamily":false,"variants":[]},"ARL":{"aliases":["arl"],"class":"dye","freeTextAliases":["arl"],"isFamily":false,"variants":[]},"ATTO425":{"aliases":["atto 425","atto425"],"class":"dye","freeTextAliases":["atto 425","atto425"],"isFamily":false,"variants":[]},"ATTO488":{"aliases":["atto 488","atto488"],"class":"dye","freeTextAliases":["atto 488","atto488"],"isFamily":false,"variants":[]},"ATTO520":{"aliases":["atto 520","atto520"],"class":"dye","freeTextAliases":["atto 520","atto520"],"isFamily":false,"variants":[]},"ATTO550":{"aliases":["atto 550","atto550"],"class":"dye","freeTextAliases":["atto 550","atto550"],"isFamily":false,"variants":[]},"ATTO565":{"aliases":["atto 565","atto565"],"class":"dye","freeTextAliases":["atto 565","atto565"],"isFamily":false,"variants":[]},"ATTO590":{"aliases":["atto 590","atto590"],"class":"dye","freeTextAliases":["atto 590","atto590"],"isFamily":false,"variants":[]},"ATTO633":{"aliases":["atto 633","atto633"],"class":"dye","freeTextAliases":["atto 633","atto633"],"isFamily":false,"variants":[]},"ATTO647":{"aliases":["atto 647","atto647"],"class":"dye","freeTextAliases":["atto 647","atto647"],"isFamily":false,"variants":[]},"ATTO647N":{"aliases":["atto 647-n","atto 647n","atto647-n","atto647n"],"class":"dye","freeTextAliases":["atto 647-n","atto 647n","atto647-n","atto647n"],"isFamily":false,"variants":[]},"ATTO700":{"aliases":["atto 700","atto700"],"class":"dye","freeTextAliases":["atto 700","atto700"],"isFamily":false,"variants":[]},"BFP":{"aliases":["bfp"],"class":"protein","freeTextAliases":["bfp"],"isFamily":false,"variants":[]},"BODIPY":{"aliases":["bodipy"],"class":"dye","freeTextAliases":["bodipy"],"isFamily":true,"variants":[]},"CALCEIN":{"aliases":["calcein","calcein am","calcein-am"],"class":"dye","freeTextAliases":["calcein","calcein am","calcein-am"],"isFamily":false,"variants":[]},"CELLMASK":{"aliases":["cell mask","cellmask"],"class":"dye","freeTextAliases":["cell mask","cellmask"],"isFamily":false,"variants":[]},"CERULEAN":{"aliases":["cerulean"],"class":"protein","freeTextAliases":[],"isFamily":false,"variants":[]},"CFP":{"aliases":["cfp"],"class":"protein","freeTextAliases":["cfp"],"isFamily":false,"variants":[]},"CITRINE":{"aliases":["citrine"],"class":"protein","freeTextAliases":[],"isFamily":false,"variants":[]},"CLIP":{"aliases":["clip","clip tag","clip-tag","cliptag"],"class":"tag","freeTextAliases":["clip tag","clip-tag","cliptag"],"isFamily":false,"variants":[]},"CY2":{"aliases":["cy2","cyanine2"],"class":"dye","freeTextAliases":["cy2","cyanine2"],"isFamily":false,"variants":[]},"CY3":{"aliases":["cy3","cyanine3"],"class":"dye","freeTextAliases":["cy3","cyanine3"],"isFamily":false,"variants":[]},"CY5":{"aliases":["cy5","cyanine5"],"class":"dye","freeTextAliases":["cy5","cyanine5"],"isFamily":false,"variants":[]},"CY7":{"aliases":["cy7","cyanine7"],"class":"dye","freeTextAliases":["cy7","cyanine7"],"isFamily":false,"variants":[]},"DAPI":{"aliases":["dapi"],"class":"dye","freeTextAliases":["dapi"],"isFamily":false,"variants":[]},"DRAQ5":{"aliases":["draq 5","draq5"],"class":"dye","freeTextAliases":["draq 5","draq5"],"isFamily":false,"variants":[]},"DYLIGHT488":{"aliases":["dylight 488","dylight488"],"class":"dye","freeTextAliases":["dylight 488","dylight488"],"isFamily":false,"variants":[]},"DYLIGHT550":{"aliases":["dylight 550","dylight550"],"class":"dye","freeTextAliases":["dylight 550","dylight550"],"isFamily":false,"variants":[]},"DYLIGHT650":{"aliases":["dylight 650","dylight650"],"class":"dye","freeTextAliases":["dylight 650","dylight650"],"isFamily":false,"variants":[]},"ERTRACKER":{"aliases":["er tracker","er-tracker","ertracker"],"class":"dye","freeTextAliases":["er tracker","er-tracker","ertracker"],"isFamily":false,"variants":[]},"FITC":{"aliases":["fitc"],"class":"dye","freeTextAliases":["fitc"],"isFamily":false,"variants":[]},"FLUO4":{"aliases":["fluo 4","fluo-4","fluo4"],"class":"indicator","freeTextAliases":["fluo 4","fluo-4","fluo4"],"isFamily":false,"variants":[]},"FURA2":{"aliases":["fura 2","fura-2","fura2"],"class":"indicator","freeTextAliases":["fura 2","fura-2","fura2"],"isFamily":false,"variants":[]},"GCAMP":{"aliases":["gcamp","gcamp3","gcamp5","gcamp6","gcamp6f","gcamp6m","gcamp6s","gcamp7","gcamp7f","gcamp7s"],"class":"indicator","freeTextAliases":["gcamp","gcamp3","gcamp5","gcamp6","gcamp6f","gcamp6m","gcamp6s","gcamp7","gcamp7f","gcamp7s"],"isFamily":true,"variants":["gcamp3","gcamp5","gcamp6","gcamp6f","gcamp6m","gcamp6s","gcamp7","gcamp7f","gcamp7s"]},"GFP":{"aliases":["egfp","gfp","gfp+"],"class":"protein","freeTextAliases":["egfp","gfp","gfp+"],"isFamily":false,"variants":[]},"HALO":{"aliases":["halo","halo tag","halo-tag","halotag"],"class":"tag","freeTextAliases":["halo tag","halo-tag","halotag"],"isFamily":false,"variants":[]},"HOECHST":{"aliases":["hoechst","hoechst 33258","hoechst 33342","hoechst33258","hoechst33342"],"class":"dye","freeTextAliases":["hoechst","hoechst 33258","hoechst 33342","hoechst33258","hoechst33342"],"isFamily":false,"variants":[]},"IRFP":{"aliases":["irfp"],"class":"protein","freeTextAliases":["irfp"],"isFamily":false,"variants":[]},"JF549":{"aliases":["janelia fluor 549","jf 549","jf549"],"class":"dye","freeTextAliases":["janelia fluor 549","jf 549","jf549"],"isFamily":false,"variants":[]},"JF646":{"aliases":["janelia fluor 646","jf 646","jf646"],"class":"dye","freeTextAliases":["janelia fluor 646","jf 646","jf646"],"isFamily":false,"variants":[]},"LYSOTRACKER":{"aliases":["lyso tracker","lysotracker","lysotracker green","lysotracker red"],"class":"dye","freeTextAliases":["lyso tracker","lysotracker","lysotracker green","lysotracker red"],"isFamily":true,"variants":["lysotracker green","lysotracker red"]},"MCHERRY":{"aliases":["mcherry"],"class":"protein","freeTextAliases":["mcherry"],"isFamily":false,"variants":[]},"MEMERALD":{"aliases":["emerald","memerald"],"class":"protein","freeTextAliases":["memerald"],"isFamily":false,"variants":[]},"MIRFP":{"aliases":["mirfp"],"class":"protein","freeTextAliases":["mirfp"],"isFamily":false,"variants":[]},"MITOTRACKER":{"aliases":["mito tracker","mitotracker","mitotracker deep red","mitotracker green","mitotracker orange","mitotracker red"],"class":"dye","freeTextAliases":["mito tracker","mitotracker","mitotracker deep red","mitotracker green","mitotracker orange","mitotracker red"],"isFamily":true,"variants":["mitotracker deep red","mitotracker green","mitotracker orange","mitotracker red"]},"MNEONGREEN":{"aliases":["mneongreen","neongreen"],"class":"protein","freeTextAliases":["mneongreen","neongreen"],"isFamily":false,"variants":[]},"MRUBY":{"aliases":["mruby"],"class":"protein","freeTextAliases":["mruby"],"isFamily":false,"variants":[]},"MSCARLET":{"aliases":["mscarlet"],"class":"protein","freeTextAliases":["mscarlet"],"isFamily":false,"variants":[]},"MTURQUOISE":{"aliases":["mturquoise"],"class":"protein","freeTextAliases":["mturquoise"],"isFamily":false,"variants":[]},"PHALLOIDIN":{"aliases":["phalloidin"],"class":"moiety","freeTextAliases":["phalloidin"],"isFamily":false,"variants":[]},"PROPIDIUMIODIDE":{"aliases":["propidium iodide","propidiumiodide"],"class":"dye","freeTextAliases":["propidium iodide","propidiumiodide"],"isFamily":false,"variants":[]},"RFP":{"aliases":["rfp"],"class":"protein","freeTextAliases":["rfp"],"isFamily":false,"variants":[]},"SIRACTIN":{"aliases":["sir actin","sir-actin","siractin"],"class":"dye","freeTextAliases":["sir actin","sir-actin","siractin"],"isFamily":false,"variants":[]},"SIRTUBULIN":{"aliases":["sir tubulin","sir-tubulin","sirtubulin"],"class":"dye","freeTextAliases":["sir tubulin","sir-tubulin","sirtubulin"],"isFamily":false,"variants":[]},"SNAP":{"aliases":["snap","snap tag","snap-tag","snaptag"],"class":"tag","freeTextAliases":["snap tag","snap-tag","snaptag"],"isFamily":false,"variants":[]},"SOX":{"aliases":["sox"],"class":"dye","freeTextAliases":["sox"],"isFamily":false,"variants":[]},"SOX2":{"aliases":["sox2"],"class":"dye","freeTextAliases":["sox2"],"isFamily":false,"variants":[]},"SYTOX":{"aliases":["sytox","sytox blue","sytox green","sytox orange","sytox red"],"class":"dye","freeTextAliases":["sytox","sytox blue","sytox green","sytox orange","sytox red"],"isFamily":true,"variants":["sytox blue","sytox green","sytox orange","sytox red"]},"TDTOMATO":{"aliases":["td-tomato","tdtomato","tomato"],"class":"protein","freeTextAliases":["td-tomato","tdtomato"],"isFamily":false,"variants":[]},"TEXASRED":{"aliases":["texas red","texas-red","texasred"],"class":"dye","freeTextAliases":["texas red","texas-red","texasred"],"isFamily":false,"variants":[]},"TRITC":{"aliases":["tritc"],"class":"dye","freeTextAliases":["tritc"],"isFamily":false,"variants":[]},"VENUS":{"aliases":["venus"],"class":"protein","freeTextAliases":[],"isFamily":false,"variants":[]},"WGA":{"aliases":["wga"],"class":"moiety","freeTextAliases":["wga"],"isFamily":false,"variants":[]},"YFP":{"aliases":["yfp"],"class":"protein","freeTextAliases":["yfp"],"isFamily":false,"variants":[]}},"version":1},"questions":[{"field":"naming.fields.date","id":"date","priority":10,"prompt":"When was this acquired?","tag":"user","type":"text","why":"The date is the first token in every filename this tool renders, and sorts your files chronologically without you having to name them that way."},{"field":"naming.fields.exptype","id":"exptype","priority":20,"prompt":"What kind of experiment is this?","tag":"user","type":"text","why":"The experiment type groups related acquisitions together in a folder listing (e.g. CT for a control, G1G2 for a two-generation comparison)."},{"field":"naming.fields.sample","id":"sample","priority":30,"prompt":"What's the sample or specimen identifier?","tag":"user","type":"text","why":"This is what tells two files with the same date and experiment type apart -- it should be unique within that experiment."},{"field":"naming.fields.magnification","id":"magnification","priority":40,"prompt":"What magnification or objective was used?","tag":"user","type":"text","why":"Filtering by magnification later (e.g. finding every 63x acquisition) only works if it's in the filename."},{"field":"naming.fields.markers","id":"markers","priority":50,"prompt":"Which markers or fluorophores were imaged?","tag":"user","type":"text","why":"Markers are the main thing collaborators search filenames for -- worth getting into the name even if it's also in the metadata."},{"field":"specimen.organism","id":"organism","priority":60,"prompt":"What organism or cell line is this?","tag":"user","type":"text","why":"Groups this experiment with others on the same model system when you're searching later."},{"field":"specimen.sampleType","id":"sampleType","priority":70,"prompt":"What type of sample is it (e.g. tissue section, cell culture, whole mount)?","tag":"user","type":"text","why":"Sample type changes what acquisition settings and controls are typical -- later steps use this to tailor their suggestions."},{"askWhen":{"exists":"specimen.organism"},"field":"specimen.preparation","id":"preparation","priority":80,"prompt":"How was the sample prepared?","tag":"user","type":"text","why":"Fixation and mounting method affects which controls and settings make sense, and is easy to forget by the time you write the paper."},{"field":"acquisition.instrument","id":"instrument","priority":90,"prompt":"Which instrument did you use?","tag":"user","type":"text","why":"Ties this experiment to the instrument's known objectives, lasers, and detectors for later acquisition guidance."},{"allowOther":true,"field":"acquisition.modality","id":"modality","options":["confocal","widefield","STED","light-sheet","SEM","TEM","Raman"],"priority":100,"prompt":"What imaging modality is this?","tag":"user","type":"choice","why":"Modality drives modality-specific guidance later -- confocal, widefield and STED have different pitfalls worth flagging. Not every modality is optical: SEM/TEM/Raman samples typically have no biological or technical replicates in the usual sense, which is why those are separate, independently-optional questions."},{"allowOther":true,"field":"readoutText","id":"readout","options":["Bacterial viability","Macrophage cytoskeleton","Intracellular ROS","Scratch / migration"],"priority":15,"prompt":"What is this assay's readout?","tag":"user","type":"choice","why":"The readout drives the control guidance on the study overview -- a viability assay, a ROS assay, and a migration assay each need a different reference control, and the app can only suggest the right ones once it knows which you're running."},{"field":"design.biologicalReplicates","id":"biologicalReplicates","priority":110,"prompt":"How many biological replicates?","tag":"user","type":"number","why":"Determines how many condition rows the design expands into and whether the sample size is worth flagging as low."},{"field":"design.technicalReplicates","id":"technicalReplicates","priority":111,"prompt":"How many technical replicates per biological replicate, if any?","tag":"user","type":"number","why":"Technical replicates (repeat acquisitions of the same biological sample) get their own token in the filename, separate from biological replicates -- leave this blank if you didn't take any."},{"field":"naming.fields.notes","id":"notes","priority":120,"prompt":"Anything else worth noting about this acquisition?","tag":"user","type":"text","why":"A free-text escape hatch for anything the other questions didn't capture -- entirely optional."}],"readouts":{"readouts":{"bacterial-viability":{"aliases":["viability","live/dead","live dead","syto9","syto9/pi","syto9-pi"],"label":"Bacterial viability"},"macrophage-cytoskeleton":{"aliases":["cytoskeleton","phalloidin","actin","f-actin"],"label":"Macrophage cytoskeleton"},"ros":{"aliases":["reactive oxygen species","oxidative stress","dcf","dcfda","dcf-da"],"label":"Intracellular ROS"},"scratch-migration":{"aliases":["wound healing","wound-healing","migration","scratch assay","scratch"],"label":"Scratch / migration"}},"version":1},"spectra":{"fluorophores":{"ALEXA405":{"emissionPeakNm":421,"excitationPeakNm":401,"reviewStatus":"claude-drafted"},"ALEXA430":{"emissionPeakNm":539,"excitationPeakNm":434,"reviewStatus":"claude-drafted"},"ALEXA488":{"emissionPeakNm":525,"excitationPeakNm":490,"reviewStatus":"claude-drafted"},"ALEXA514":{"emissionPeakNm":542,"excitationPeakNm":517,"reviewStatus":"claude-drafted"},"ALEXA532":{"emissionPeakNm":553,"excitationPeakNm":532,"reviewStatus":"claude-drafted"},"ALEXA546":{"emissionPeakNm":573,"excitationPeakNm":556,"reviewStatus":"claude-drafted"},"ALEXA555":{"emissionPeakNm":565,"excitationPeakNm":555,"reviewStatus":"claude-drafted"},"ALEXA568":{"emissionPeakNm":603,"excitationPeakNm":578,"reviewStatus":"claude-drafted"},"ALEXA594":{"emissionPeakNm":617,"excitationPeakNm":590,"reviewStatus":"claude-drafted"},"ALEXA647":{"emissionPeakNm":665,"excitationPeakNm":650,"reviewStatus":"claude-drafted"},"ALEXA660":{"emissionPeakNm":690,"excitationPeakNm":663,"reviewStatus":"claude-drafted"},"ALEXA680":{"emissionPeakNm":702,"excitationPeakNm":679,"reviewStatus":"claude-drafted"},"ALEXA750":{"emissionPeakNm":775,"excitationPeakNm":749,"reviewStatus":"claude-drafted"},"ATTO425":{"emissionPeakNm":484,"excitationPeakNm":438,"reviewStatus":"claude-drafted"},"ATTO488":{"emissionPeakNm":523,"excitationPeakNm":501,"reviewStatus":"claude-drafted"},"ATTO520":{"emissionPeakNm":538,"excitationPeakNm":516,"reviewStatus":"claude-drafted"},"ATTO550":{"emissionPeakNm":576,"excitationPeakNm":554,"reviewStatus":"claude-drafted"},"ATTO565":{"emissionPeakNm":592,"excitationPeakNm":563,"reviewStatus":"claude-drafted"},"ATTO590":{"emissionPeakNm":624,"excitationPeakNm":594,"reviewStatus":"claude-drafted"},"ATTO633":{"emissionPeakNm":657,"excitationPeakNm":629,"reviewStatus":"claude-drafted"},"ATTO647":{"emissionPeakNm":669,"excitationPeakNm":645,"reviewStatus":"claude-drafted"},"ATTO647N":{"emissionPeakNm":669,"excitationPeakNm":644,"reviewStatus":"claude-drafted"},"ATTO700":{"emissionPeakNm":719,"excitationPeakNm":700,"reviewStatus":"claude-drafted"},"BFP":{"emissionPeakNm":445,"excitationPeakNm":383,"reviewStatus":"claude-drafted"},"CALCEIN":{"emissionPeakNm":515,"excitationPeakNm":495,"reviewStatus":"claude-drafted"},"CERULEAN":{"emissionPeakNm":475,"excitationPeakNm":433,"reviewStatus":"claude-drafted"},"CFP":{"emissionPeakNm":477,"excitationPeakNm":434,"reviewStatus":"claude-drafted"},"CITRINE":{"emissionPeakNm":529,"excitationPeakNm":516,"reviewStatus":"claude-drafted"},"CY2":{"emissionPeakNm":506,"excitationPeakNm":489,"reviewStatus":"claude-drafted"},"CY3":{"emissionPeakNm":570,"excitationPeakNm":550,"reviewStatus":"claude-drafted"},"CY5":{"emissionPeakNm":670,"excitationPeakNm":649,"reviewStatus":"claude-drafted"},"CY7":{"emissionPeakNm":773,"excitationPeakNm":750,"reviewStatus":"claude-drafted"},"DAPI":{"emissionPeakNm":461,"excitationPeakNm":358,"reviewStatus":"claude-drafted"},"DRAQ5":{"emissionPeakNm":681,"excitationPeakNm":646,"reviewStatus":"claude-drafted"},"DYLIGHT488":{"emissionPeakNm":518,"excitationPeakNm":493,"reviewStatus":"claude-drafted"},"DYLIGHT550":{"emissionPeakNm":576,"excitationPeakNm":562,"reviewStatus":"claude-drafted"},"DYLIGHT650":{"emissionPeakNm":673,"excitationPeakNm":654,"reviewStatus":"claude-drafted"},"FITC":{"emissionPeakNm":519,"excitationPeakNm":495,"reviewStatus":"claude-drafted"},"FLUO4":{"emissionPeakNm":516,"excitationPeakNm":494,"reviewStatus":"claude-drafted"},"GCAMP":{"emissionPeakNm":509,"excitationPeakNm":488,"note":"Spectrally ~one dye (cpEGFP) across every GCaMP variant despite markers.json's isFamily:true -- variants (6f/6s/7/...) differ in Ca2+ affinity and kinetics, not color, so this entry deliberately has no per-variant sub-entries.","reviewStatus":"claude-drafted"},"GFP":{"emissionPeakNm":507,"excitationPeakNm":488,"reviewStatus":"claude-drafted"},"HOECHST":{"emissionPeakNm":461,"excitationPeakNm":350,"note":"Hoechst 33342, the variant overwhelmingly used for live-cell DNA stain.","reviewStatus":"claude-drafted"},"IRFP":{"emissionPeakNm":713,"excitationPeakNm":690,"note":"iRFP713, the most common near-infrared iRFP variant; other iRFP variants differ.","reviewStatus":"claude-drafted"},"JF549":{"emissionPeakNm":571,"excitationPeakNm":549,"reviewStatus":"claude-drafted"},"JF646":{"emissionPeakNm":664,"excitationPeakNm":646,"reviewStatus":"claude-drafted"},"LYSOTRACKER":{"isFamily":true,"reviewStatus":"claude-drafted","variants":{"lysotracker green":{"emissionPeakNm":511,"excitationPeakNm":504},"lysotracker red":{"emissionPeakNm":590,"excitationPeakNm":577}}},"MCHERRY":{"emissionPeakNm":610,"excitationPeakNm":587,"reviewStatus":"claude-drafted"},"MEMERALD":{"emissionPeakNm":509,"excitationPeakNm":487,"reviewStatus":"claude-drafted"},"MIRFP":{"emissionPeakNm":703,"excitationPeakNm":683,"note":"Approximate; several named miRFP variants (miRFP670/703/720) differ by tens of nm -- treat this single entry as indicative only until a specific variant is confirmed.","reviewStatus":"claude-drafted"},"MITOTRACKER":{"isFamily":true,"reviewStatus":"claude-drafted","variants":{"mitotracker deep red":{"emissionPeakNm":665,"excitationPeakNm":644},"mitotracker green":{"emissionPeakNm":516,"excitationPeakNm":490},"mitotracker orange":{"emissionPeakNm":576,"excitationPeakNm":551},"mitotracker red":{"emissionPeakNm":599,"excitationPeakNm":579}}},"MNEONGREEN":{"emissionPeakNm":517,"excitationPeakNm":506,"reviewStatus":"claude-drafted"},"MRUBY":{"emissionPeakNm":605,"excitationPeakNm":558,"reviewStatus":"claude-drafted"},"MSCARLET":{"emissionPeakNm":594,"excitationPeakNm":569,"reviewStatus":"claude-drafted"},"MTURQUOISE":{"emissionPeakNm":474,"excitationPeakNm":434,"reviewStatus":"claude-drafted"},"PROPIDIUMIODIDE":{"emissionPeakNm":617,"excitationPeakNm":535,"note":"Peaks shift on nucleic-acid binding; values given are for DNA-bound PI, the relevant state for imaging.","reviewStatus":"claude-drafted"},"SIRACTIN":{"emissionPeakNm":674,"excitationPeakNm":652,"note":"SiR (silicon-rhodamine) actin probe; same parent dye as SiR-tubulin, so the two are NOT spectrally distinguishable from each other -- a real cross-check finding, not a drafting error.","reviewStatus":"claude-drafted"},"SIRTUBULIN":{"emissionPeakNm":674,"excitationPeakNm":652,"note":"SiR (silicon-rhodamine) tubulin probe; same parent dye as SiR-actin.","reviewStatus":"claude-drafted"},"SYTOX":{"isFamily":true,"reviewStatus":"claude-drafted","variants":{"sytox blue":{"emissionPeakNm":480,"excitationPeakNm":444},"sytox green":{"emissionPeakNm":523,"excitationPeakNm":504},"sytox orange":{"emissionPeakNm":570,"excitationPeakNm":547},"sytox red":{"emissionPeakNm":658,"excitationPeakNm":640}}},"TDTOMATO":{"emissionPeakNm":581,"excitationPeakNm":554,"reviewStatus":"claude-drafted"},"TEXASRED":{"emissionPeakNm":615,"excitationPeakNm":596,"reviewStatus":"claude-drafted"},"TRITC":{"emissionPeakNm":572,"excitationPeakNm":547,"reviewStatus":"claude-drafted"},"VENUS":{"emissionPeakNm":528,"excitationPeakNm":515,"reviewStatus":"claude-drafted"},"YFP":{"emissionPeakNm":527,"excitationPeakNm":514,"reviewStatus":"claude-drafted"}},"overlapRules":{"emissionProximityNm":25,"excitationProximityNm":20,"note":"Thresholds are a domain judgment call pending review against FACSI's actual filter sets (K-3, instruments/objectives/lines/detectors, not yet authored). Emission proximity is the primary (error-severity) check: typical bandpass emission filters are 20-40 nm wide and most dye/FP emission curves have a 40-60 nm FWHM, so peaks this close will substantially co-register in each other's detection window regardless of exact filter choice. Excitation proximity is secondary (warning-severity): standard laser lines are spaced 40-100+ nm apart specifically so one line excites one dye class, and this flag makes the existing confocal-sequential-scanning advisor tip panel-specific and concrete.","reviewStatus":"claude-drafted"},"version":1},"stages":{"rules":[{"id":"pilot-sted-on-confocal-first","note":"STED sessions are slower, more bleach-prone, and typically shared-instrument time -- pilot your staining, dye choice, and mounting on a confocal first, then move to STED only once the biology and the sample prep are already validated.","priority":10,"stage":"pilot","when":{"eq":["acquisition.modality","STED"]}},{"id":"pilot-light-sheet-mounting","note":"Light-sheet imaging usually requires specific sample mounting or clearing that a standard confocal prep does not need -- confirm your mounting protocol is compatible before the first real light-sheet session, ideally by checking it under a confocal first.","priority":10,"stage":"pilot","when":{"eq":["acquisition.modality","light-sheet"]}},{"id":"pilot-em-fixation-irreversible","note":"EM fixation and processing are destructive and irreversible -- a failed fixation protocol destroys the sample it was tested on. Pilot the fixation protocol on a spare or lower-value sample, and confirm the biology looks right under light microscopy first, before committing your real samples to EM processing.","priority":10,"stage":"pilot","when":{"in":["acquisition.modality",["SEM","TEM"]]}},{"id":"validate-viability-heat-killed-first","note":"Before imaging the full sample set, confirm the heat-killed control actually reads as fully PI-positive at your chosen settings -- if it doesn't, the viability gate is miscalibrated and every subsequent sample's percent-dead is unreliable.","priority":20,"stage":"validate-controls","when":{"eq":["readout","bacterial-viability"]}},{"id":"validate-migration-mitomycin-first","note":"Confirm the mitomycin-C-treated control actually shows slower closure than the untreated scratch in your pilot -- if it doesn't block proliferation as expected at your chosen dose, migration and proliferation stay confounded in the full study too.","priority":20,"stage":"validate-controls","when":{"eq":["readout","scratch-migration"]}},{"id":"acquisition-ros-photobleaching-budget","note":"ROS-sensitive probes like DCF are photolabile, and the excitation light itself can generate additional ROS -- fix laser power and exposure to the lowest setting that gives usable signal in the pilot, and use identical settings for every sample so the readout reflects biology, not variable photo-induced signal.","priority":20,"stage":"acquisition-settings","when":{"eq":["readout","ros"]}}],"stages":[{"body":"State the research question in one sentence, name the readout you are actually measuring (viability, cytoskeleton, ROS, migration -- whatever it is for this assay), and identify one modality you could reasonably run tomorrow, on equipment you already have access to. Everything below builds on committing to those three things first.","id":"idea","order":10,"title":"Idea & feasibility"},{"body":"Run a small pilot (n=1-2) on the cheapest, simplest microscope that can plausibly answer the question, before booking time on an advanced or shared instrument. A pilot's job is to catch a broken protocol or a wrong assumption while it is still cheap to fix.","id":"pilot","order":20,"title":"Pilot on the simplest sufficient scope"},{"body":"Run every control this assay needs (see the Controls section above) on the pilot samples, and confirm each one behaves as expected -- a heat-killed control should read as dead, an isotype control should read as background -- before spending time imaging the full sample set. A control that fails to behave as expected invalidates every sample imaged before it is fixed.","id":"validate-controls","order":30,"title":"Validate your controls"},{"body":"Lock exposure, gain, laser power, and pinhole size from the pilot data, then keep them fixed for every subsequent acquisition -- changing settings mid-study makes samples incomparable. Use the pilot's own variance to judge whether the planned number of biological replicates is enough to see the effect you are looking for, before committing to the full n.","id":"acquisition-settings","order":40,"title":"Fix acquisition settings & power the design"},{"body":"Once the pilot, the controls, and the acquisition settings are all locked, move to the advanced or specialized modality the study actually calls for (STED, light-sheet, EM) if one is needed -- not before, since advanced-instrument time is the most expensive place to discover a protocol problem.","id":"advanced-modality","order":50,"title":"Move to advanced or specialized microscopy"}],"version":1}};
 </script>
 <script>
 (function () {
@@ -3001,7 +3062,7 @@ function describePredicate(pred) {
 // naming an unknown surface is dropped with an issue, not silently inert.
 // Adding a surface later is one entry here plus one UI wire-up, in the same
 // commit.
-const ADVICE_SURFACES = ['describe', 'design', 'naming'];
+const ADVICE_SURFACES = ['describe', 'design', 'naming', 'panel'];
 
 const ADVICE_KINDS = ['pitfall', 'tip'];
 
@@ -4603,6 +4664,339 @@ function interviewProgress(questions, experiment) {
   const askable = nextQuestions(questions, experiment, questions.length).length;
   return { answered, askable, skipped, total: questions.length };
 }
+  // ---- src/engine/spectra.js ----
+// The color panel (qualitative spectral-spillover advisor): a loader for
+// web/kb/spectra.json, a five-state resolver from a free-text markers field
+// to spectral data, and a pairwise peak-proximity evaluator.
+//
+// Mirrors engine/controls.js's loader discipline deliberately: an explicit
+// whitelist per entry, never a spread of the raw JSON, so a new/misspelled
+// property is silently DROPPED here until it is added to this list by name
+// -- see advisor.js's own header for why (this project has shipped the
+// opposite failure once already).
+//
+// QUALITATIVE, NOT AN INTEGRAL: the pairwise check below is peak-proximity
+// on two numbers (excitation/emission peak nanometers), not a real spectral-
+// overlap-integral over excitation/emission curves. See
+// docs/plans/planner-web-color-panel.md, Decision 2, for why proximity was
+// chosen and why the thresholds live in the KB as data rather than as
+// engine constants.
+//
+// Five-state resolution (Decision 5, same plan doc), never a boolean
+// known/unknown -- mirrors controls.js's readoutState never-silent
+// discipline one level deeper:
+//   'unrecognized'         -- no alias match at all (likely a typo).
+//   'ambiguous-family'     -- resolves to an isFamily canonical, but the
+//                             matched alias isn't one of its listed variants
+//                             (e.g. bare "MitoTracker") -- cannot check
+//                             spillover without knowing which color.
+//   'no-intrinsic-spectrum'-- resolves to a tag/moiety (HaloTag, phalloidin,
+//                             ...) -- spillover depends on the conjugate
+//                             dye, not the tag itself.
+//   'spectrum-unavailable' -- a real, recognized dye/protein/indicator, just
+//                             not yet drafted in spectra.json -- an honest
+//                             content gap, not a silent drop.
+//   'known'                -- full peaks available; participates in the
+//                             pairwise check.
+//
+// Pure module: no DOM, no store. Imports splitMarkers (the ONE existing
+// tokenizer for this field, not a second regex) and kbMarker (the one
+// existing marker-class/isFamily lookup, already reserved but previously
+// uncalled in production).
+
+
+const SPECTRAL_STATES = [
+  'unrecognized',
+  'ambiguous-family',
+  'no-intrinsic-spectrum',
+  'spectrum-unavailable',
+  'known',
+];
+
+const DEFAULT_REVIEW_STATUS = 'claude-drafted';
+const DEFAULT_EMISSION_PROXIMITY_NM = 25;
+const DEFAULT_EXCITATION_PROXIMITY_NM = 20;
+
+const KNOWN_FLUOROPHORE_KEYS = new Set([
+  'excitationPeakNm',
+  'emissionPeakNm',
+  'isFamily',
+  'variants',
+  'reviewStatus',
+  'note',
+]);
+const KNOWN_VARIANT_KEYS = new Set(['excitationPeakNm', 'emissionPeakNm']);
+
+function spectraIssue(field, message) {
+  return { field, message, severity: 'error' };
+}
+
+function normalizeVariantEntry(canonical, variantKey, entry, issues) {
+  if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
+    issues.push(spectraIssue(canonical, `variant '${variantKey}' entry is not an object`));
+    return null;
+  }
+  for (const key of Object.keys(entry)) {
+    if (!KNOWN_VARIANT_KEYS.has(key)) {
+      issues.push(spectraIssue(canonical, `variant '${variantKey}' has an unrecognized property '${key}' -- it will be ignored`));
+    }
+  }
+  const excitationPeakNm = entry.excitationPeakNm;
+  const emissionPeakNm = entry.emissionPeakNm;
+  if (typeof excitationPeakNm !== 'number' || typeof emissionPeakNm !== 'number') {
+    issues.push(spectraIssue(canonical, `variant '${variantKey}' is missing numeric excitationPeakNm/emissionPeakNm`));
+    return null;
+  }
+  return { excitationPeakNm, emissionPeakNm };
+}
+
+/**
+ * Validate and normalize one raw fluorophore entry. Returns `null` (with
+ * issues pushed) if the entry cannot be shipped; otherwise a normalized
+ * `{isFamily, reviewStatus, excitationPeakNm, emissionPeakNm}` (non-family)
+ * or `{isFamily: true, reviewStatus, variants: {variantKey: {excitationPeakNm, emissionPeakNm}}}`.
+ *
+ * Deliberately independent of markers.json's own `isFamily` flag (Decision 3):
+ * this pack's `isFamily` may disagree (e.g. GCaMP is isFamily in markers.json
+ * but ONE spectrum here, since its variants differ in kinetics, not color).
+ */
+function normalizeFluorophoreEntry(canonical, entry, issues) {
+  if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
+    issues.push(spectraIssue(canonical, 'fluorophore entry is not an object'));
+    return null;
+  }
+  for (const key of Object.keys(entry)) {
+    if (!KNOWN_FLUOROPHORE_KEYS.has(key)) {
+      issues.push(spectraIssue(canonical, `fluorophore entry has an unrecognized property '${key}' -- it will be ignored`));
+    }
+  }
+
+  const reviewStatus =
+    typeof entry.reviewStatus === 'string' && entry.reviewStatus.trim() ? entry.reviewStatus.trim() : DEFAULT_REVIEW_STATUS;
+
+  if (entry.isFamily === true) {
+    const rawVariants = entry.variants;
+    const isPlainObject = rawVariants !== null && typeof rawVariants === 'object' && !Array.isArray(rawVariants);
+    if (!isPlainObject || Object.keys(rawVariants).length === 0) {
+      issues.push(spectraIssue(canonical, "family fluorophore 'variants' must be a non-empty object"));
+      return null;
+    }
+    const variants = {};
+    for (const [variantKey, variantEntry] of Object.entries(rawVariants)) {
+      const normalized = normalizeVariantEntry(canonical, variantKey, variantEntry, issues);
+      if (normalized) variants[variantKey.toLowerCase()] = normalized;
+    }
+    if (Object.keys(variants).length === 0) return null;
+    return { isFamily: true, reviewStatus, variants };
+  }
+
+  const excitationPeakNm = entry.excitationPeakNm;
+  const emissionPeakNm = entry.emissionPeakNm;
+  if (typeof excitationPeakNm !== 'number' || typeof emissionPeakNm !== 'number') {
+    issues.push(
+      spectraIssue(canonical, "fluorophore entry is missing numeric excitationPeakNm/emissionPeakNm (or isFamily:true with 'variants')")
+    );
+    return null;
+  }
+  return { isFamily: false, reviewStatus, excitationPeakNm, emissionPeakNm };
+}
+
+/**
+ * Validate and normalize a raw spectra pack into
+ * `{fluorophores, overlapRules, issues}`. TOTAL: never throws. A malformed
+ * entry is dropped and reported rather than aborting the whole pack -- one
+ * bad entry must not silence every entry.
+ *
+ * `raw` is the parsed contents of web/kb/spectra.json: `{version,
+ * fluorophores, overlapRules}`.
+ */
+function loadSpectraKb(raw) {
+  const issues = [];
+  const isPlainObject = raw !== null && typeof raw === 'object' && !Array.isArray(raw);
+  const source = isPlainObject ? raw : {};
+
+  if (!isPlainObject) {
+    issues.push(spectraIssue('spectra', 'spectra pack is missing -- run tools/export_markers_kb.py'));
+  } else if (source.version !== 1) {
+    issues.push(spectraIssue('spectra', `spectra pack version is ${JSON.stringify(source.version ?? null)}, expected 1`));
+  }
+
+  const rawFluorophores =
+    source.fluorophores && typeof source.fluorophores === 'object' && !Array.isArray(source.fluorophores) ? source.fluorophores : {};
+  const fluorophores = {};
+  for (const [canonical, entry] of Object.entries(rawFluorophores)) {
+    const normalized = normalizeFluorophoreEntry(canonical, entry, issues);
+    if (normalized) fluorophores[canonical] = normalized;
+  }
+
+  const rawOverlapRules =
+    source.overlapRules && typeof source.overlapRules === 'object' && !Array.isArray(source.overlapRules) ? source.overlapRules : {};
+
+  const emissionProximityNm =
+    typeof rawOverlapRules.emissionProximityNm === 'number' ? rawOverlapRules.emissionProximityNm : DEFAULT_EMISSION_PROXIMITY_NM;
+  if (typeof rawOverlapRules.emissionProximityNm !== 'number') {
+    issues.push(spectraIssue('overlapRules', `overlapRules.emissionProximityNm is missing/non-numeric -- defaulting to ${emissionProximityNm}`));
+  }
+
+  const excitationProximityNm =
+    typeof rawOverlapRules.excitationProximityNm === 'number' ? rawOverlapRules.excitationProximityNm : DEFAULT_EXCITATION_PROXIMITY_NM;
+  if (typeof rawOverlapRules.excitationProximityNm !== 'number') {
+    issues.push(
+      spectraIssue('overlapRules', `overlapRules.excitationProximityNm is missing/non-numeric -- defaulting to ${excitationProximityNm}`)
+    );
+  }
+
+  const overlapReviewStatus =
+    typeof rawOverlapRules.reviewStatus === 'string' && rawOverlapRules.reviewStatus.trim()
+      ? rawOverlapRules.reviewStatus.trim()
+      : DEFAULT_REVIEW_STATUS;
+
+  return {
+    fluorophores,
+    overlapRules: { emissionProximityNm, excitationProximityNm, reviewStatus: overlapReviewStatus },
+    issues,
+  };
+}
+
+/**
+ * Resolve ONE already-split token (a canonical-cased or free-typed marker
+ * spelling, as produced by engine/validation.js's splitMarkers) to its
+ * five-state spectral resolution. TOTAL: never throws, and always returns a
+ * `{token, canonical, state, ...}` shape -- `excitationPeakNm`/
+ * `emissionPeakNm`/`reviewStatus` are present only when `state === 'known'`.
+ *
+ * `markerIndex` is core/kb.js's indexKb() output (for alias -> canonical);
+ * `markersKb` is core/kb.js's loadKb() `{kb}` (for kbMarker's class/
+ * isFamily/variants); `fluorophores` is this module's loadSpectraKb()
+ * `fluorophores` map.
+ */
+function resolveMarkerToken(token, markerIndex, markersKb, fluorophores) {
+  const needle = typeof token === 'string' ? token.trim().toLowerCase() : '';
+  const canonical = markerIndex && markerIndex.aliasToCanonical ? markerIndex.aliasToCanonical.get(needle) : undefined;
+
+  if (!canonical) {
+    return { token, canonical: null, state: 'unrecognized' };
+  }
+
+  const markerEntry = kbMarker(markersKb, canonical);
+  const markerClass = markerEntry ? markerEntry.class : undefined;
+  if (markerClass === 'tag' || markerClass === 'moiety') {
+    return { token, canonical, state: 'no-intrinsic-spectrum' };
+  }
+
+  const spectraEntry = fluorophores ? fluorophores[canonical] : undefined;
+  if (!spectraEntry) {
+    return { token, canonical, state: 'spectrum-unavailable' };
+  }
+
+  if (spectraEntry.isFamily) {
+    const variant = spectraEntry.variants[needle];
+    if (!variant) {
+      return { token, canonical, state: 'ambiguous-family' };
+    }
+    return {
+      token,
+      canonical,
+      state: 'known',
+      excitationPeakNm: variant.excitationPeakNm,
+      emissionPeakNm: variant.emissionPeakNm,
+      reviewStatus: spectraEntry.reviewStatus,
+    };
+  }
+
+  return {
+    token,
+    canonical,
+    state: 'known',
+    excitationPeakNm: spectraEntry.excitationPeakNm,
+    emissionPeakNm: spectraEntry.emissionPeakNm,
+    reviewStatus: spectraEntry.reviewStatus,
+  };
+}
+
+/**
+ * Resolve the WHOLE markers free-text field (naming.fields.markers, the
+ * one source of truth per docs/plans/planner-web-color-panel.md Decision 1)
+ * into `{panelState, entries}`. `panelState` is `'unanswered'` (field is
+ * empty -- the panel has nothing to check yet, never silently equivalent to
+ * "0 conflicts") or `'has-entries'`. Deduplicates by resolved canonical (an
+ * unrecognized token dedupes by its own text instead, since it has none),
+ * keeping the FIRST-seen token spelling for display -- so typing the same
+ * marker twice under different casing/spacing doesn't double-count a pair.
+ */
+function resolvePanel(markersFieldText, markerIndex, markersKb, fluorophores) {
+  const text = typeof markersFieldText === 'string' ? markersFieldText.trim() : '';
+  if (!text) return { panelState: 'unanswered', entries: [] };
+
+  const tokens = splitMarkers(text);
+  const seen = new Set();
+  const entries = [];
+  for (const token of tokens) {
+    const resolved = resolveMarkerToken(token, markerIndex, markersKb, fluorophores);
+    const dedupeKey = resolved.canonical || `token:${resolved.token}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    entries.push(resolved);
+  }
+  return { panelState: 'has-entries', entries };
+}
+
+/**
+ * The pairwise qualitative overlap check (Decision 2): every unordered pair
+ * of 'known' entries, flagged on emission-peak proximity (severity 'error')
+ * and independently on excitation-peak proximity (severity 'warning').
+ * Returns `{field, message, severity}` records -- the same shape as
+ * engine/validation.js's validationIssue, so callers reuse the existing
+ * `.issues-list`/`.issue-{severity}` rendering unchanged.
+ *
+ * Deterministic order: ascending gap size, ties broken by the pair's sorted
+ * canonical ids then by severity -- so re-rendering the same panel never
+ * reorders the flags.
+ */
+function flagPanelOverlaps(entries, overlapRules) {
+  const known = entries.filter((e) => e.state === 'known');
+  const rules = overlapRules || { emissionProximityNm: DEFAULT_EMISSION_PROXIMITY_NM, excitationProximityNm: DEFAULT_EXCITATION_PROXIMITY_NM };
+  const flags = [];
+
+  for (let i = 0; i < known.length; i++) {
+    for (let j = i + 1; j < known.length; j++) {
+      // Order the pair by a stable key (canonical, falling back to token),
+      // NOT by array/loop index -- otherwise "A and B" vs "B and A" in the
+      // message text would depend on the caller's iteration order, breaking
+      // the determinism this function promises regardless of input order.
+      const left = known[i];
+      const right = known[j];
+      const [a, b] =
+        (left.canonical || left.token) <= (right.canonical || right.token) ? [left, right] : [right, left];
+      const pairKey = [a.canonical, b.canonical].sort().join('|');
+
+      const emissionGapNm = Math.abs(a.emissionPeakNm - b.emissionPeakNm);
+      if (emissionGapNm < rules.emissionProximityNm) {
+        flags.push({
+          field: 'panel',
+          message: `${a.token} and ${b.token}: emission peaks ${emissionGapNm} nm apart (under the ${rules.emissionProximityNm} nm proximity threshold) -- likely to co-register in each other's detection window.`,
+          severity: 'error',
+          gap: emissionGapNm,
+          pairKey,
+        });
+      }
+
+      const excitationGapNm = Math.abs(a.excitationPeakNm - b.excitationPeakNm);
+      if (excitationGapNm < rules.excitationProximityNm) {
+        flags.push({
+          field: 'panel',
+          message: `${a.token} and ${b.token}: excitation peaks ${excitationGapNm} nm apart (under the ${rules.excitationProximityNm} nm proximity threshold) -- likely both excited by a single laser line.`,
+          severity: 'warning',
+          gap: excitationGapNm,
+          pairKey,
+        });
+      }
+    }
+  }
+
+  flags.sort((x, y) => x.gap - y.gap || x.pairKey.localeCompare(y.pairKey) || x.severity.localeCompare(y.severity));
+  return flags.map(({ field, message, severity }) => ({ field, message, severity }));
+}
   // ---- src/engine/stages.js ----
 // The staged progression ladder (idea -> pilot -> validate controls -> fix
 // acquisition settings -> advanced modality): a genuinely new knowledge type
@@ -4831,13 +5225,20 @@ function buildLadder(stages, rules, experiment) {
 
 
 /**
- * Shape the raw KB object into { index, questions, advisor, readouts,
- * controlRules, stages, stageRules, issues }.
+ * Shape the raw KB object into { index, markersKb, questions, advisor,
+ * readouts, controlRules, stages, stageRules, spectra, overlapRules, issues }.
  *
  * `raw` is globalThis.__MICRONAUT_KB__ (or an already-defaulted `{}`):
  * an object keyed by filename stem -- `raw.markers`, `raw.questions`,
- * `raw.advisor`, `raw.readouts`, `raw.controls`, `raw.stages` --
- * aggregated at build/dev time from web/kb/*.json.
+ * `raw.advisor`, `raw.readouts`, `raw.controls`, `raw.stages`, `raw.spectra`
+ * -- aggregated at build/dev time from web/kb/*.json.
+ *
+ * `markersKb` is `loadKb`'s own `{version, markers, ambiguousInFreeText}`
+ * shape -- previously computed here and immediately discarded once `index`
+ * was built from it. engine/spectra.js's resolveMarkerToken needs it (via
+ * core/kb.js's kbMarker) to read a marker's `class`/`isFamily`, so it is now
+ * part of the returned shape rather than a second, redundant loadKb() call
+ * a future caller might otherwise be tempted to make.
  *
  * TOTAL, like every loader it composes: a missing or malformed `raw`, or any
  * missing key on it, degrades to a usable empty shape plus issues, never a
@@ -4855,16 +5256,20 @@ function shapeAppKb(raw) {
   const { readouts, issues: readoutIssues } = loadReadouts(source.readouts);
   const { rules: controlRules, issues: controlIssues } = loadControlRules(source.controls);
   const { stages, rules: stageRules, issues: stageIssues } = loadStages(source.stages);
+  const { fluorophores: spectra, overlapRules, issues: spectraIssues } = loadSpectraKb(source.spectra);
 
   return {
     index,
+    markersKb,
     questions,
     advisor,
     readouts,
     controlRules,
     stages,
     stageRules,
-    issues: [...markerIssues, ...advisorIssues, ...readoutIssues, ...controlIssues, ...stageIssues],
+    spectra,
+    overlapRules,
+    issues: [...markerIssues, ...advisorIssues, ...readoutIssues, ...controlIssues, ...stageIssues, ...spectraIssues],
   };
 }
   // ---- src/engine/plan.js ----
@@ -5035,6 +5440,92 @@ function studyNameIssues(experiment, config, baseTemplate) {
   }
 
   return issues;
+}
+  // ---- src/engine/render/csv.js ----
+// CSV renderer over engine/studydoc.js's document model -- a fourth thin
+// renderer over the same single model already consumed by the HTML view,
+// renderMarkdown, and renderMermaid (see studydoc.js's header for why one
+// model / many renderers). Pure function: no DOM, no store.
+//
+// One row per planned file across every assay in the study, so this is a
+// bench-usable manifest: which physical file goes with which condition.
+// Crossing factors are flattened into one "factors" column (`name=level;
+// name2=level2`) rather than one CSV column per factor name, because
+// different assays in the same study can declare different factors --
+// a fixed column set would either go ragged across assays or force a
+// union-of-all-assays header that is mostly blank for most rows. This
+// keeps the CSV rectangular regardless of how many assays/factors exist.
+//
+// TOTAL: never throws. A malformed/empty document renders as a
+// header-only CSV, never a blank string and never a thrown error.
+
+const HEADER = [
+  'assay',
+  'modality',
+  'group',
+  'factors',
+  'biological_replicate',
+  'technical_replicate',
+  'planned_filename',
+  'error',
+];
+
+// RFC 4180 minimal quoting: only quote a field that needs it, so the common
+// case (a plain filename) stays readable unquoted.
+function csvField(value) {
+  const text = value === null || value === undefined ? '' : String(value);
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function factorsCell(factorLevels) {
+  const entries = factorLevels && typeof factorLevels === 'object' ? Object.entries(factorLevels) : [];
+  return entries.map(([name, level]) => `${name}=${level}`).join('; ');
+}
+
+function renderCsv(doc) {
+  const assays = doc && Array.isArray(doc.assays) ? doc.assays : [];
+  const lines = [HEADER.join(',')];
+
+  for (const assay of assays) {
+    const label = assay.label || '';
+    const modality = assay.modality || '';
+    const filenames = Array.isArray(assay.filenames) ? assay.filenames : [];
+    for (const entry of filenames) {
+      const row = entry.row || {};
+      lines.push(
+        [
+          csvField(label),
+          csvField(modality),
+          csvField(row.group ?? ''),
+          csvField(factorsCell(row.factorLevels)),
+          csvField(row.bioRep ?? ''),
+          csvField(row.techRep ?? ''),
+          csvField(entry.filename ?? ''),
+          csvField(entry.error ?? ''),
+        ].join(',')
+      );
+    }
+  }
+
+  // CRLF line endings: the conventional CSV wire format (RFC 4180), so the
+  // export opens cleanly in spreadsheet tools that assume it.
+  return lines.join('\r\n') + '\r\n';
+}
+  // ---- src/engine/render/json.js ----
+// JSON renderer over engine/studydoc.js's document model -- the "raw data"
+// export sibling of render/markdown.js and render/mermaid.js. Pure
+// function: no DOM, no store. buildStudyDocument is already deterministic
+// (see studydoc.js's header), so a plain stringify is deterministic too --
+// no key-sorting pass needed on top.
+//
+// TOTAL: never throws. JSON.stringify only throws on a BigInt or a
+// circular reference, neither of which studydoc.js's plain-object/array/
+// string/number/null shape can produce.
+function renderJson(doc) {
+  return JSON.stringify(doc ?? null, null, 2);
 }
   // ---- src/engine/render/mermaid.js ----
 // Renders a study document (engine/studydoc.js) to a mermaid flowchart
@@ -5604,7 +6095,17 @@ function buildStudyDocument(experiment, kb, config, baseTemplate) {
       controls,
       stageNotes,
       namingFields: effectiveNamingFields(view),
+      // `row` (group/factorLevels/bioRep/techRep) rides along so a CSV
+      // renderer can emit one column per design axis without re-deriving
+      // the condition matrix itself -- the same "one model, three renderers"
+      // reasoning as this module's header, one field deeper.
       filenames: filenamePlan.map((entry) => ({
+        row: {
+          group: entry.row.group,
+          factorLevels: { ...entry.row.factorLevels },
+          bioRep: entry.row.bioRep,
+          techRep: entry.row.techRep,
+        },
         groupLabel: entry.groupLabel,
         filename: entry.filename,
         error: entry.error || null,
@@ -7418,6 +7919,13 @@ const guideStep = {
           'convention is assembled from the design — you rarely type a filename by hand.',
       ],
       [
+        'Color panel',
+        'A qualitative check for spectral spillover across the markers you entered on Naming — ' +
+          'flags fluorophore pairs whose excitation or emission peaks sit too close together. ' +
+          'Not a spectral-overlap integral, and the spectral values are Claude-drafted, not yet ' +
+          'reviewed.',
+      ],
+      [
         'Overview',
         'A read-only summary of the whole study: a visual study map, the recommended ' +
           'controls, a step-by-step “how to run this project” walkthrough, and every planned ' +
@@ -7857,6 +8365,30 @@ function createOverviewStep(kb) {
       });
       actions.appendChild(downloadSvgBtn);
 
+      const downloadCsvBtn = document.createElement('button');
+      downloadCsvBtn.type = 'button';
+      downloadCsvBtn.className = 'copy-button';
+      downloadCsvBtn.textContent = 'Download file manifest (.csv)';
+      downloadCsvBtn.addEventListener('click', () => {
+        const freshDoc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
+        const filename = `${(freshDoc.study.title || 'study-manifest').replace(/[^A-Za-z0-9_-]+/g, '-')}.csv`;
+        downloadTextFile(renderCsv(freshDoc), filename, 'text/csv');
+        if (showToast) showToast('Downloaded the file manifest as CSV.');
+      });
+      actions.appendChild(downloadCsvBtn);
+
+      const downloadJsonBtn = document.createElement('button');
+      downloadJsonBtn.type = 'button';
+      downloadJsonBtn.className = 'copy-button';
+      downloadJsonBtn.textContent = 'Download raw data (.json)';
+      downloadJsonBtn.addEventListener('click', () => {
+        const freshDoc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
+        const filename = `${(freshDoc.study.title || 'study-overview').replace(/[^A-Za-z0-9_-]+/g, '-')}.json`;
+        downloadTextFile(renderJson(freshDoc), filename, 'application/json');
+        if (showToast) showToast('Downloaded the study overview as JSON.');
+      });
+      actions.appendChild(downloadJsonBtn);
+
       const printBtn = document.createElement('button');
       printBtn.type = 'button';
       printBtn.className = 'copy-button';
@@ -7909,6 +8441,157 @@ function createOverviewStep(kb) {
         renderAssayNode(tree, assay);
       }
       main.appendChild(tree);
+    },
+  };
+}
+  // ---- src/ui/steps/panel.js ----
+// The Color panel step: a qualitative spectral-spillover advisor over the
+// active assay's markers field. Pure read over naming.fields.markers (the
+// ONE source of truth for "which fluorophores are in this assay" -- see
+// docs/plans/planner-web-color-panel.md, Decision 1; the long-reserved,
+// never-built panel.targets/panel.channels stays untouched), reusing
+// engine/validation.js's splitMarkers rather than a second tokenizer.
+//
+// The spectral content in web/kb/spectra.json is Claude-drafted, exactly
+// like web/kb/advisor.json's 16 rules -- NOT a placeholder, but not yet
+// reviewed by Daniel either. The persistent review banner below is the
+// in-app half of that flag (ROADMAP.md's "Parked review" bullet is the
+// doc-level half); it is deliberately not dismissible, matching advice.js's
+// restraint rather than becoming a one-time toast nobody remembers.
+//
+// Five-state, never-silent rendering throughout (Decision 5): an empty
+// markers field, a fully-resolved panel with zero flagged pairs, and a
+// token this app cannot resolve all get their OWN explicit sentence, never
+// a blank section that could be misread as "no risk here."
+
+
+const STATE_LABELS = {
+  unrecognized: 'Not recognized',
+  'ambiguous-family': 'Which variant?',
+  'no-intrinsic-spectrum': 'No intrinsic spectrum',
+  'spectrum-unavailable': 'Spectrum not yet available',
+  known: 'Known',
+};
+
+function stateSentence(entry) {
+  switch (entry.state) {
+    case 'unrecognized':
+      return `"${entry.token}" isn't a marker this app recognizes yet -- check the spelling on the Naming step.`;
+    case 'ambiguous-family':
+      return `"${entry.token}" names a multi-color family -- specify which variant (e.g. "${entry.token} Red") to check it for spillover.`;
+    case 'no-intrinsic-spectrum':
+      return `"${entry.token}" has no spectrum of its own -- spillover depends on which dye it's conjugated to, not the tag itself.`;
+    case 'spectrum-unavailable':
+      return `"${entry.token}" is a recognized marker, but its spectrum isn't in this app's knowledge pack yet -- an honest gap, not a silent skip.`;
+    default:
+      return `"${entry.token}" -- excitation ${entry.excitationPeakNm} nm / emission ${entry.emissionPeakNm} nm.`;
+  }
+}
+
+function appendRow(list, entry) {
+  const row = document.createElement('div');
+  row.className = `panel-row panel-row-${entry.state}`;
+
+  const stateLabel = document.createElement('span');
+  stateLabel.className = 'panel-state';
+  stateLabel.textContent = STATE_LABELS[entry.state] || entry.state;
+  row.appendChild(stateLabel);
+
+  const text = document.createElement('span');
+  text.className = 'panel-row-text';
+  text.textContent = stateSentence(entry);
+  row.appendChild(text);
+
+  if (entry.state === 'known') {
+    const badge = document.createElement('span');
+    badge.className = 'panel-badge';
+    badge.title = 'Spectral value drafted by Claude from common published references -- not yet reviewed by Daniel.';
+    badge.textContent = entry.reviewStatus === 'claude-drafted' ? 'unreviewed' : entry.reviewStatus;
+    row.appendChild(badge);
+  }
+
+  list.appendChild(row);
+}
+
+function createPanelStep(kb) {
+  return {
+    id: 'panel',
+    title: 'Color panel',
+    render(main, store, { advisor } = {}) {
+      main.textContent = '';
+
+      const heading = document.createElement('h1');
+      heading.className = 'step-heading';
+      heading.textContent = 'Color panel';
+      main.appendChild(heading);
+
+      const explainer = document.createElement('p');
+      explainer.className = 'proposals-empty';
+      explainer.textContent =
+        'A qualitative check for spectral spillover across this assay’s fluorophores -- excitation/emission peak proximity only, not a spectral-overlap integral.';
+      main.appendChild(explainer);
+
+      const banner = document.createElement('div');
+      banner.className = 'panel-review-banner';
+      banner.textContent =
+        'Spectral values below are drafted by Claude from common published references and have not yet been reviewed by Daniel -- treat exact peak numbers as approximate until reviewed.';
+      main.appendChild(banner);
+
+      // Commit 1 of the assay tier: caching activeAssayId once here is only
+      // safe because the active assay never changes for the lifetime of one
+      // render -- see naming.js's identical comment; main.js's assay-switch
+      // handler forces a full re-render of whichever step is on screen.
+      const assayId = store.get().activeAssayId;
+      const view = assayView(store.get(), assayId);
+      const markersText = (view.naming && view.naming.fields && view.naming.fields.markers) || '';
+
+      const { panelState, entries } = resolvePanel(markersText, kb.index, kb.markersKb, kb.spectra);
+
+      if (panelState === 'unanswered') {
+        const empty = document.createElement('p');
+        empty.className = 'panel-empty';
+        empty.textContent = 'No markers entered yet -- fill in the markers field on the Naming step to see a color panel here.';
+        main.appendChild(empty);
+      } else {
+        const list = document.createElement('div');
+        list.className = 'panel-list';
+        for (const entry of entries) {
+          appendRow(list, entry);
+        }
+        main.appendChild(list);
+
+        const known = entries.filter((e) => e.state === 'known');
+        const flags = flagPanelOverlaps(entries, kb.overlapRules);
+
+        const flagsHeading = document.createElement('div');
+        flagsHeading.className = 'proposals-heading';
+        flagsHeading.textContent = 'Spillover flags';
+        main.appendChild(flagsHeading);
+
+        if (flags.length > 0) {
+          const issuesList = document.createElement('ul');
+          issuesList.className = 'issues-list';
+          for (const flag of flags) {
+            const li = document.createElement('li');
+            li.className = 'issue issue-' + flag.severity;
+            li.textContent = flag.message;
+            issuesList.appendChild(li);
+          }
+          main.appendChild(issuesList);
+        } else {
+          const noFlags = document.createElement('p');
+          noFlags.className = 'panel-empty';
+          noFlags.textContent =
+            known.length > 0
+              ? `No spectral-proximity conflicts among ${known.length} recognized fluorophore(s).`
+              : 'No recognized fluorophores with spectral data yet -- see the states above.';
+          main.appendChild(noFlags);
+        }
+      }
+
+      const advicePanel = createAdvicePanel(advisor || [], 'panel');
+      main.appendChild(advicePanel.element);
+      advicePanel.update(view);
     },
   };
 }
@@ -8248,18 +8931,23 @@ function init() {
 
   const kb = loadAppKb();
   const describeStep = createDescribeStep(kb);
+  const panelStep = createPanelStep(kb);
   const overviewStep = createOverviewStep(kb);
   // Study first: it is the study-level surface sitting above every assay,
   // and the discoverability point for "this app can model more than one
   // assay" -- the router lands on steps[0] by default, so this is also the
   // new landing step. See docs/plans/planner-web-assay-tier.md, commit 2.
+  // Panel after Naming: it reads naming.fields.markers (Naming is where that
+  // field is entered), and is itself a pure read -- no new facts entered
+  // here either. See ui/steps/panel.js's module header and
+  // docs/plans/planner-web-color-panel.md, Decision 1.
   // Overview last: it is a pure READ over every other step's data (the
   // shareable diagram + deterministic walkthrough), never a place new facts
   // are entered -- see ui/steps/overview.js's module header.
   // Guide LAST: it must not displace the deliberate Study landing page
   // (router lands on steps[0]), but stays permanently in the nav so a
   // first-time tester can find it. See ui/steps/guide.js's header.
-  const steps = [studyStep, describeStep, designStep, namingStep, overviewStep, guideStep];
+  const steps = [studyStep, describeStep, designStep, namingStep, panelStep, overviewStep, guideStep];
   const router = createRouter(steps);
 
   const root = document.getElementById('app');
