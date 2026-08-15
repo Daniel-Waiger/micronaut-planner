@@ -883,6 +883,45 @@ button:focus-visible {
   cursor: default;
 }
 
+/* Color-panel patch: per-fluorophore color swatches -- read-only on the
+   free-text list above, editable/overridable via a native color picker on
+   the structured channel row. */
+.panel-color-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  flex: 0 0 auto;
+  display: inline-block;
+}
+
+.panel-color-input {
+  width: 30px;
+  height: 26px;
+  padding: 1px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.panel-color-reset {
+  font: inherit;
+  font-size: 11px;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  flex: 0 0 auto;
+}
+
+.panel-color-reset:hover {
+  color: var(--ink);
+}
+
 .describe-textarea {
   width: 100%;
   min-height: 120px;
@@ -4299,6 +4338,89 @@ function summarizeTrigger(predicate) {
   if (value.length === 1) return `${label} is ${value[0]}`;
   return `${label} is ${value.slice(0, -1).join(', ')} or ${value[value.length - 1]}`;
 }
+  // ---- src/engine/color.js ----
+// Wavelength -> display-color mapping for the Color panel step: turns a
+// fluorophore's emission peak (nm) into a light, screen-friendly swatch --
+// e.g. DAPI's ~460 nm emission renders as a light sky blue, GFP's ~510 nm as
+// a light green, Texas Red's ~615 nm as orange-red -- matching the
+// conventional imaging/flow-cytometry idiom of coloring a channel by its
+// emission color, not a spectrophotometer trace.
+//
+// Deliberately NOT a physically accurate CIE wavelength-to-RGB conversion:
+// those render quite dark/desaturated near the violet and red edges of the
+// visible range, which reads poorly as a small UI swatch and doesn't match
+// how imaging software actually colors channels. Instead this is a
+// piecewise-linear hue curve fit to the same rough spectral order, held at a
+// fixed light/saturated HSL so every swatch stays legible on both this app's
+// light and dark themes. Qualitative by design -- same posture as
+// spectra.js's peak-proximity check, not a claim of colorimetric accuracy.
+//
+// Pure module: no DOM.
+
+// [nm, hueDegrees], hue expressed as a continuous (non-wrapped) value so
+// linear interpolation never has to special-case crossing 0/360 -- the final
+// hueForWavelength() reduces mod 360 exactly once, at the end. Past the
+// visible red edge (~650 nm) the curve keeps descending past 0 into
+// negative/magenta territory, matching how deep-red/near-IR channels are
+// conventionally rendered (a warm magenta/maroon, not a repeat of pure red).
+const HUE_BREAKPOINTS = [
+  [360, 280], // near-UV (Hoechst/DAPI excitation range) -- violet
+  [440, 240], // blue
+  [480, 200], // cyan-blue
+  [510, 150], // green
+  [550, 95], // yellow-green
+  [580, 50], // orange-yellow
+  [610, 20], // orange-red
+  [650, -5], // red
+  [700, -30], // deep red / near-IR, tipping toward magenta
+  [900, -60], // far-IR (extrapolated) -- magenta
+];
+
+const DEFAULT_SATURATION_PCT = 72;
+const DEFAULT_LIGHTNESS_PCT = 68;
+
+function hueForWavelength(nm) {
+  const minNm = HUE_BREAKPOINTS[0][0];
+  const maxNm = HUE_BREAKPOINTS[HUE_BREAKPOINTS.length - 1][0];
+  const clamped = Math.max(minNm, Math.min(maxNm, nm));
+
+  for (let i = 0; i < HUE_BREAKPOINTS.length - 1; i++) {
+    const [nmA, hueA] = HUE_BREAKPOINTS[i];
+    const [nmB, hueB] = HUE_BREAKPOINTS[i + 1];
+    if (clamped >= nmA && clamped <= nmB) {
+      const frac = nmB === nmA ? 0 : (clamped - nmA) / (nmB - nmA);
+      const hue = hueA + frac * (hueB - hueA);
+      return ((hue % 360) + 360) % 360;
+    }
+  }
+  // Unreachable given the clamp above, but keeps this TOTAL rather than
+  // relying on the loop always finding a bracketing pair.
+  return 0;
+}
+
+// Standard HSL -> RGB hex conversion (CSS Color 4's formula); no library
+// needed for three channels.
+function hslToHex(hueDeg, saturationPct, lightnessPct) {
+  const s = saturationPct / 100;
+  const l = lightnessPct / 100;
+  const k = (n) => (n + hueDeg / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  const toHex = (x) => Math.round(255 * x).toString(16).padStart(2, '0');
+  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
+}
+
+/**
+ * The default display color for a fluorophore with the given emission peak
+ * (nm), as a `#rrggbb` hex string. Returns `null` for a non-finite/missing
+ * peak -- callers (ui/steps/panel.js) fall back to a neutral placeholder
+ * swatch in that case, same never-silent posture as spectra.js's five
+ * states: "no color computed" is a distinct, visible case, not a guess.
+ */
+function wavelengthToColor(emissionPeakNm, { saturationPct = DEFAULT_SATURATION_PCT, lightnessPct = DEFAULT_LIGHTNESS_PCT } = {}) {
+  if (typeof emissionPeakNm !== 'number' || !Number.isFinite(emissionPeakNm)) return null;
+  return hslToHex(hueForWavelength(emissionPeakNm), saturationPct, lightnessPct);
+}
   // ---- src/engine/naming.js ----
 // Filename construction: token sanitization, reserved-stem repair,
 // extension handling, and template rendering. Faithful port of
@@ -5002,6 +5124,41 @@ const CONJUGATION_LABELS = {
 // fix was written to close -- see spectra.js's derivePanelFacts header).
 const ANTIBODY_CONJUGATION_MODES = new Set(['antibody-direct', 'antibody-indirect']);
 
+// Color-panel patch: a qualitative default detection-filter suggestion, shown
+// pre-filled in the filter inputs (ui/steps/panel.js) the moment a channel's
+// fluorophore resolves, rather than an empty pair waiting on the user to look
+// up their own numbers first. WIDTH_NM=30 is the midpoint of the "20-40 nm
+// wide" range spectra.json's own overlapRules note already documents for
+// typical bandpass emission filters -- same domain-judgment posture as that
+// note and spectra.js's peak-proximity thresholds, not a claim about any real
+// vendor part. Centered on the EMISSION peak: `filterCenterNm`/
+// `filterBandwidthNm` describe the detection filter the user's camera/PMT
+// actually looks through, which observes emitted light, not excitation.
+const DEFAULT_FILTER_BANDWIDTH_NM = 30;
+
+/**
+ * The default (unedited) filter suggestion for a channel whose fluorophore
+ * resolved to a known emission peak -- `null` when it didn't, so a caller
+ * never renders a fabricated center wavelength for a fluorophore this app
+ * has no spectral data for.
+ */
+function defaultChannelFilterPair(emissionPeakNm) {
+  if (typeof emissionPeakNm !== 'number' || !Number.isFinite(emissionPeakNm)) return null;
+  return { filterCenterNm: Math.round(emissionPeakNm), filterBandwidthNm: DEFAULT_FILTER_BANDWIDTH_NM };
+}
+
+/**
+ * The color actually shown for a channel: the user's explicit `channel.color`
+ * override when set, else `computedDefault` (engine/color.js's
+ * `wavelengthToColor` over the channel's resolved emission peak), else `null`
+ * when neither exists -- the UI renders `null` as a neutral placeholder
+ * swatch, never a guessed color.
+ */
+function effectiveChannelColor(channel, computedDefault) {
+  const override = channel && typeof channel.color === 'string' ? channel.color.trim() : '';
+  return override || computedDefault || null;
+}
+
 function panelFluorophoreFinitePeaks(entry) {
   return (
     entry &&
@@ -5091,6 +5248,10 @@ function emptyChannel(id) {
     conjugateDye: '',
     filterCenterNm: null,
     filterBandwidthNm: null,
+    // '' means "use the spectrum-derived default color" (engine/color.js) --
+    // only a non-empty value is a user override, mirroring how `color` !==
+    // '' is the one signal the UI needs to show a "reset to default" control.
+    color: '',
   };
 }
 
@@ -5137,6 +5298,7 @@ function normalizeChannels(raw) {
       conjugation: CONJUGATION_MODES.includes(entry.conjugation) ? entry.conjugation : 'direct-probe',
       conjugateDye: typeof entry.conjugateDye === 'string' ? entry.conjugateDye : '',
       ...normalizePanelFilterPair(entry),
+      color: typeof entry.color === 'string' ? entry.color : '',
     });
   }
   return channels;
@@ -5246,13 +5408,10 @@ function seedChannelsFromMarkers(resolvePanelResult, markersKb, kbMarker, makeId
       if (markerClass === 'target') conjugation = 'antibody-indirect';
       else if (markerClass === 'tag') conjugation = 'tag-ligand';
       return {
-        id: makeId(),
-        target: '',
+        ...emptyChannel(makeId()),
         fluorophore: conjugation === 'tag-ligand' ? '' : entry.token,
         conjugation,
         conjugateDye: conjugation === 'tag-ligand' ? entry.token : '',
-        filterCenterNm: null,
-        filterBandwidthNm: null,
       };
     });
 }
@@ -13374,6 +13533,16 @@ function appendRow(list, entry) {
   row.appendChild(text);
 
   if (entry.state === 'known') {
+    // Informational only here -- read-only, derived straight from the
+    // emission peak (engine/color.js). The editable, overridable color lives
+    // on the structured channel below, where there is somewhere to persist
+    // an override; this free-text row has no per-token storage of its own.
+    const swatch = document.createElement('span');
+    swatch.className = 'panel-color-swatch';
+    swatch.style.backgroundColor = wavelengthToColor(entry.emissionPeakNm) || 'transparent';
+    swatch.title = `Color from ${entry.emissionPeakNm} nm emission peak`;
+    row.appendChild(swatch);
+
     const badge = document.createElement('span');
     badge.className = 'panel-badge';
     badge.title = 'Spectral value drafted by Claude from common published references -- not yet reviewed by a microscopy specialist.';
@@ -13608,6 +13777,61 @@ function createPanelStep(kb) {
         });
         row.appendChild(dragHandle);
 
+        // Color, per fluorophore (color-panel patch): a swatch computed from
+        // the channel's own resolved emission peak (engine/color.js), with a
+        // native color picker to override it and a reset link back to auto.
+        // Resolved the SAME way the free-text list above does (spectra.js's
+        // resolveMarkerToken) so this channel's default can never disagree
+        // with what the Color panel's qualitative check already knows about
+        // this fluorophore name.
+        const channelSpectralValue = channelSpectralField(channel).trim();
+        const channelResolved = channelSpectralValue
+          ? resolveMarkerToken(channelSpectralValue, kb.index, kb.markersKb, kb.spectra)
+          : null;
+        const computedColor =
+          channelResolved && channelResolved.state === 'known' ? wavelengthToColor(channelResolved.emissionPeakNm) : null;
+        const effectiveColor = effectiveChannelColor(channel, computedColor);
+        const isColorOverride = Boolean(channel.color);
+
+        const colorSwatch = document.createElement('span');
+        colorSwatch.className = 'panel-color-swatch';
+        colorSwatch.style.backgroundColor = effectiveColor || 'transparent';
+        row.appendChild(colorSwatch);
+
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.className = 'panel-color-input';
+        colorInput.value = effectiveColor || '#808080';
+        colorInput.title = isColorOverride
+          ? 'Your chosen color'
+          : effectiveColor
+            ? 'Default color, from this fluorophore’s emission peak -- pick one to override'
+            : 'Pick a channel color';
+        colorInput.addEventListener('input', () => {
+          const next = currentChannels();
+          next[index] = { ...next[index], color: colorInput.value };
+          writeChannelsData(next);
+          colorSwatch.style.backgroundColor = colorInput.value;
+        });
+        colorInput.addEventListener('change', () => {
+          writeChannelsStructure(currentChannels()); // structural: reveals/hides the reset control
+        });
+        row.appendChild(colorInput);
+
+        if (isColorOverride) {
+          const colorResetBtn = document.createElement('button');
+          colorResetBtn.type = 'button';
+          colorResetBtn.className = 'panel-color-reset';
+          colorResetBtn.textContent = 'auto';
+          colorResetBtn.title = 'Reset to the color computed from this fluorophore’s emission peak';
+          colorResetBtn.addEventListener('click', () => {
+            const next = currentChannels();
+            next[index] = { ...next[index], color: '' };
+            writeChannelsStructure(next);
+          });
+          row.appendChild(colorResetBtn);
+        }
+
         const targetInput = channelField(document.createElement('input'), 'panel-row-text');
         targetInput.type = 'text';
         targetInput.placeholder = 'Target (e.g. F-actin, Sox2)';
@@ -13708,11 +13932,33 @@ function createPanelStep(kb) {
           return input;
         }
 
-        const centerInput = filterInput('Filter center (nm)', 'e.g. 525', channel.filterCenterNm, 300, 900);
-        const bandwidthInput = filterInput('Bandwidth (nm)', 'e.g. 50', channel.filterBandwidthNm, 1, 300);
+        // Filters, upfront by default (color-panel patch): a channel whose
+        // fluorophore resolves shows a pre-filled suggestion the moment it
+        // resolves (engine/panelAssembly.js's defaultChannelFilterPair) --
+        // never an empty pair of boxes waiting on the user to look up their
+        // own numbers first. Nothing is written to the store until the user
+        // actually edits a field (see writeFilterPair below); a channel with
+        // an explicit, already-saved pair always shows exactly that, never
+        // the computed default.
+        const hasSavedFilterPair = typeof channel.filterCenterNm === 'number' && typeof channel.filterBandwidthNm === 'number';
+        const computedFilterDefault =
+          !hasSavedFilterPair && channelResolved && channelResolved.state === 'known'
+            ? defaultChannelFilterPair(channelResolved.emissionPeakNm)
+            : null;
+        const displayedCenterNm = hasSavedFilterPair ? channel.filterCenterNm : computedFilterDefault ? computedFilterDefault.filterCenterNm : null;
+        const displayedBandwidthNm = hasSavedFilterPair
+          ? channel.filterBandwidthNm
+          : computedFilterDefault
+            ? computedFilterDefault.filterBandwidthNm
+            : null;
+
+        const centerInput = filterInput('Filter center (nm)', 'e.g. 525', displayedCenterNm, 300, 900);
+        const bandwidthInput = filterInput('Bandwidth (nm)', 'e.g. 50', displayedBandwidthNm, 1, 300);
         const filterHint = document.createElement('span');
         filterHint.className = 'panel-filter-hint';
-        filterHint.textContent = 'Optional; both values are required. Use the microscope’s actual detection filter.';
+        filterHint.textContent = computedFilterDefault
+          ? 'Suggested from this fluorophore’s emission peak -- edit to match the microscope’s actual detection filter.'
+          : 'Optional; both values are required. Use the microscope’s actual detection filter.';
         filterRow.appendChild(filterHint);
 
         function writeFilterPair() {
