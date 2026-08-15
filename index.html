@@ -1901,8 +1901,14 @@ button:focus-visible {
   font-size: 13px;
 }
 
+/* Each .panel-filter-field stacks a label above its input (a taller,
+   two-row control, same shape as the fluorophore picker's own label+select
+   -- see .panel-channel-main's CSS comment). Centering the hint on the
+   row's default align-items: end would still center it against that TALL
+   field's full height, leaving it above the input boxes instead of level
+   with them -- bottom-align it like every other row control instead. */
 .panel-filter-hint {
-  align-self: center;
+  align-self: end;
   color: var(--muted);
   font-size: 11.5px;
 }
@@ -14109,8 +14115,8 @@ function createPanelStep(kb) {
         const filterHint = document.createElement('span');
         filterHint.className = 'panel-filter-hint';
         filterHint.textContent = computedFilterDefault
-          ? 'Suggested from this fluorophore’s emission peak -- edit to match the microscope’s actual detection filter.'
-          : 'Optional; both values are required. Use the microscope’s actual detection filter.';
+          ? 'Suggested from this fluorophore’s emission peak -- edit to match the microscope’s actual detection filter values.'
+          : 'Optional; both values are required. Use the microscope’s actual detection filter values.';
         filterRow.appendChild(filterHint);
 
         function writeFilterPair() {
