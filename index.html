@@ -634,6 +634,7 @@ button:focus-visible {
 
 .guidance-endpoint,
 .guidance-model,
+.guidance-token,
 .guidance-question {
   font: inherit;
   font-size: 13px;
@@ -10147,6 +10148,11 @@ function buildChatUrl(target, prompt, maxChars = MAX_PREFILL_URL_CHARS) {
 const ENABLED_KEY = 'micronaut.llm.enabled';
 const ENDPOINT_KEY = 'micronaut.llm.endpoint';
 const MODEL_KEY = 'micronaut.llm.model';
+// Bearer token for a gated gateway (the "unit server" case -- a remote
+// Ollama box behind HTTPS + CORS + auth, see the server contract in
+// docs/plans/zen-planner-server-contract.md). Empty for a bare LAN Ollama
+// box, which needs no token. Never sent unless non-empty (llm/ollama.js).
+const TOKEN_KEY = 'micronaut.llm.token';
 // Separate from ENABLED_KEY on purpose: ENABLED_KEY governs the Ollama path,
 // where nothing leaves the user's own network by construction (LAN-only,
 // see llm/ollama.js's header). A chat-LLM link-out is different in kind --
@@ -10182,14 +10188,16 @@ function loadLlmConfig() {
     enabled: readLS(ENABLED_KEY, '0') === '1',
     endpoint: readLS(ENDPOINT_KEY, DEFAULT_ENDPOINT),
     model: readLS(MODEL_KEY, DEFAULT_MODEL),
+    token: readLS(TOKEN_KEY, ''),
     linkOuts: readLS(LINK_OUTS_KEY, '0') === '1',
   };
 }
 
-function saveLlmConfig({ enabled, endpoint, model, linkOuts }) {
+function saveLlmConfig({ enabled, endpoint, model, token, linkOuts }) {
   if (typeof enabled === 'boolean') writeLS(ENABLED_KEY, enabled ? '1' : '0');
   if (typeof endpoint === 'string') writeLS(ENDPOINT_KEY, endpoint);
   if (typeof model === 'string') writeLS(MODEL_KEY, model);
+  if (typeof token === 'string') writeLS(TOKEN_KEY, token);
   if (typeof linkOuts === 'boolean') writeLS(LINK_OUTS_KEY, linkOuts ? '1' : '0');
 }
   // ---- src/llm/manualPaste.js ----
@@ -10296,6 +10304,7 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
 function createOllamaProvider({
   endpoint,
   model,
+  token,
   keepAlive = -1,
   numCtx = DEFAULT_NUM_CTX,
   timeoutMs = DEFAULT_TIMEOUT_MS,
@@ -10346,9 +10355,16 @@ function createOllamaProvider({
           body.format = schema;
         }
 
+        const headers = { 'Content-Type': 'application/json' };
+        // Optional: unset for a bare LAN Ollama box, set when pointed at a
+        // gated gateway (the "unit server" preset) that requires a bearer
+        // token in front of it -- see the server contract in
+        // docs/plans/zen-planner-server-contract.md.
+        if (token) headers.Authorization = `Bearer ${token}`;
+
         const response = await doFetch(`${endpoint.replace(/\/+$/, '')}/api/chat`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(body),
           signal: controller.signal,
         });
@@ -10412,6 +10428,67 @@ function isProvider(candidate) {
     typeof candidate.isAvailable === 'function' &&
     typeof candidate.complete === 'function'
   );
+}
+  // ---- src/llm/rateLimit.js ----
+// Client-side soft rate-limit UX for remote (Ollama/unit-server) calls: a
+// persisted rolling window of request timestamps so the UI can show "N left
+// this hour" / a cooldown before the user hits a wall, rather than after.
+//
+// This is UX only, not enforcement -- the plan's server contract
+// (docs/plans/zen-planner-server-contract.md) makes the gateway the
+// authoritative limit. A user can clear localStorage and keep going; that's
+// fine, because the server still rejects them. This module exists so a
+// well-behaved client doesn't surprise the user with a silent 429.
+//
+// Manual-paste calls are never recorded here -- they never leave the
+// browser, so they don't count against any server-side limit either.
+
+const LOG_KEY = 'micronaut.llm.requestLog';
+const DEFAULT_LIMIT = 5;
+const WINDOW_MS = 60 * 60 * 1000;
+
+function readLog() {
+  try {
+    const raw = localStorage.getItem(LOG_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((t) => typeof t === 'number') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLog(entries) {
+  try {
+    localStorage.setItem(LOG_KEY, JSON.stringify(entries));
+  } catch {
+    // Best-effort persistence, same as llm/config.js -- a failed write just
+    // means the counter resets next load.
+  }
+}
+
+function pruneToWindow(entries, now) {
+  return entries.filter((t) => now - t < WINDOW_MS);
+}
+
+/** Records one remote request happening now. Call only for an actual Ollama call, never manual-paste. */
+function recordOllamaRequest(now = Date.now()) {
+  const entries = pruneToWindow(readLog(), now);
+  entries.push(now);
+  writeLog(entries);
+}
+
+/** How many remote requests are still allowed in the current rolling hour. */
+function ollamaRequestsRemaining(limit = DEFAULT_LIMIT, now = Date.now()) {
+  const entries = pruneToWindow(readLog(), now);
+  return Math.max(0, limit - entries.length);
+}
+
+/** Seconds until the oldest request in the current window ages out (0 if under the limit already). */
+function ollamaCooldownSeconds(limit = DEFAULT_LIMIT, now = Date.now()) {
+  const entries = pruneToWindow(readLog(), now).sort((a, b) => a - b);
+  if (entries.length < limit) return 0;
+  const oldest = entries[entries.length - limit];
+  return Math.max(0, Math.ceil((oldest + WINDOW_MS - now) / 1000));
 }
   // ---- src/ui/clipboard.js ----
 // Shared clipboard-copy helper. Extracted from ui/steps/naming.js (its
@@ -11092,6 +11169,22 @@ function startElapsedLabel(button, verb) {
   }, 1000);
   return () => clearInterval(timer);
 }
+  // ---- src/ui/rateLimitLabel.js ----
+// Shared soft-rate-limit label text for every remote-model call site
+// (guidance.js's Ask, describe.js's Draft and Suggest) -- one copy of the
+// wording, matching llmStatus.js's COLD_START_HINT idiom.
+
+
+/** `{ text, atLimit }` for the current rolling-hour window, given a request limit. */
+function rateLimitLabel(limit = DEFAULT_LIMIT) {
+  const remaining = ollamaRequestsRemaining(limit);
+  if (remaining > 0) {
+    return { text: `${remaining} of ${limit} requests left this hour`, atLimit: false };
+  }
+  const cooldown = ollamaCooldownSeconds(limit);
+  const minutes = Math.max(1, Math.ceil(cooldown / 60));
+  return { text: `Hourly limit reached -- try again in about ${minutes} min`, atLimit: true };
+}
   // ---- src/ui/guidance.js ----
 // The Guidance panel (local-llm-guidance, capability A): an opt-in "ask
 // about this step" feature. OFF by default (llm/config.js) and, even when
@@ -11113,9 +11206,19 @@ function startElapsedLabel(button, verb) {
 // the rest of ui/ (shell.js's standing rule).
 
 
+// file:// has no notion of an authorized CORS origin, and offline has no
+// network at all -- either way a remote endpoint can never actually be
+// reached, so the remote path is hidden and manual-paste (which needs
+// nothing but the page itself) is the only option shown.
+function remoteInferenceAvailable() {
+  const isFileOrigin = typeof location !== 'undefined' && location.protocol === 'file:';
+  const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  return !isFileOrigin && !isOffline;
+}
+
 function buildProvider(config) {
-  if (config.enabled && config.endpoint && config.model) {
-    return createOllamaProvider({ endpoint: config.endpoint, model: config.model });
+  if (remoteInferenceAvailable() && config.enabled && config.endpoint && config.model) {
+    return createOllamaProvider({ endpoint: config.endpoint, model: config.model, token: config.token });
   }
   return createManualPasteProvider();
 }
@@ -11181,7 +11284,28 @@ function createGuidancePanel(getContext, { onConfigChange } = {}) {
   modelInput.placeholder = 'model name, e.g. llama3.1:8b';
   settingsRow.appendChild(modelInput);
 
+  // Only needed for a gated gateway (the "unit server" case) sitting in
+  // front of Ollama; a bare LAN Ollama box takes no token. Blank means "send
+  // no Authorization header at all" (llm/ollama.js), not "send an empty
+  // Bearer".
+  const tokenInput = document.createElement('input');
+  tokenInput.type = 'password';
+  tokenInput.className = 'guidance-token';
+  tokenInput.placeholder = 'access token (unit server only, leave blank for a bare LAN Ollama)';
+  tokenInput.autocomplete = 'off';
+  settingsRow.appendChild(tokenInput);
+
   section.appendChild(settingsRow);
+
+  // Shown instead of the settings row on file:// or while offline, where a
+  // remote endpoint can never actually be reached (see
+  // remoteInferenceAvailable() above).
+  const remoteUnavailableNotice = document.createElement('p');
+  remoteUnavailableNotice.className = 'guidance-hint guidance-remote-unavailable';
+  remoteUnavailableNotice.textContent =
+    'Running from a downloaded file or offline: only copy-paste is available here.';
+  remoteUnavailableNotice.hidden = true;
+  section.appendChild(remoteUnavailableNotice);
 
   // Set once, shown/hidden with the rest of the local-model settings: this
   // is the one place the endpoint/model config lives, so it's also the one
@@ -11193,26 +11317,46 @@ function createGuidancePanel(getContext, { onConfigChange } = {}) {
   coldStartHint.textContent = COLD_START_HINT;
   section.appendChild(coldStartHint);
 
+  // Soft client-side counter (llm/rateLimit.js) -- the server enforces the
+  // real limit, this just tells the user where they stand before they hit
+  // it. Shown/hidden alongside the rest of the enabled-and-reachable state.
+  const rateLimitHint = document.createElement('p');
+  rateLimitHint.className = 'guidance-hint guidance-rate-limit-hint';
+  section.appendChild(rateLimitHint);
+
   function syncSettingsVisibility() {
+    const remoteOk = remoteInferenceAvailable();
+    settingsRow.hidden = !remoteOk;
+    remoteUnavailableNotice.hidden = remoteOk;
     endpointInput.hidden = !enabledCheckbox.checked;
     modelInput.hidden = !enabledCheckbox.checked;
-    coldStartHint.hidden = !enabledCheckbox.checked;
+    tokenInput.hidden = !enabledCheckbox.checked;
+    coldStartHint.hidden = !remoteOk || !enabledCheckbox.checked;
+    rateLimitHint.hidden = !remoteOk || !enabledCheckbox.checked;
+    if (!rateLimitHint.hidden) rateLimitHint.textContent = rateLimitLabel().text;
   }
 
   const config = loadLlmConfig();
   enabledCheckbox.checked = config.enabled;
   endpointInput.value = config.endpoint;
   modelInput.value = config.model;
+  tokenInput.value = config.token;
   syncSettingsVisibility();
 
   function persistSettings() {
-    saveLlmConfig({ enabled: enabledCheckbox.checked, endpoint: endpointInput.value, model: modelInput.value });
+    saveLlmConfig({
+      enabled: enabledCheckbox.checked,
+      endpoint: endpointInput.value,
+      model: modelInput.value,
+      token: tokenInput.value,
+    });
     syncSettingsVisibility();
     if (typeof onConfigChange === 'function') onConfigChange();
   }
   enabledCheckbox.addEventListener('change', persistSettings);
   endpointInput.addEventListener('change', persistSettings);
   modelInput.addEventListener('change', persistSettings);
+  tokenInput.addEventListener('change', persistSettings);
 
   const questionInput = document.createElement('input');
   questionInput.type = 'text';
@@ -11272,6 +11416,13 @@ function createGuidancePanel(getContext, { onConfigChange } = {}) {
   async function ask() {
     const cfg = loadLlmConfig();
     const provider = buildProvider(cfg);
+    // The soft counter only governs actual Ollama calls -- manual-paste
+    // never leaves the browser, so it's exempt (matches recordOllamaRequest
+    // only ever being called on the 'ollama' branch below).
+    if (provider.id === 'ollama' && rateLimitLabel().atLimit) {
+      showReply(rateLimitLabel().text);
+      return;
+    }
     const context = getContext() || {};
     const { system, user: contextBlock } = buildGuidanceMessages(context.doc, context.questions);
     const question = questionInput.value.trim();
@@ -11284,6 +11435,7 @@ function createGuidancePanel(getContext, { onConfigChange } = {}) {
     const stopTicking = provider.id === 'ollama' ? startElapsedLabel(askButton, 'Asking') : null;
     if (!stopTicking) askButton.textContent = 'Asking...';
     try {
+      if (provider.id === 'ollama') recordOllamaRequest();
       const result = await provider.complete({ system, user });
       if (provider.id === 'manual-paste') {
         showPaste(result.text);
@@ -11303,6 +11455,7 @@ function createGuidancePanel(getContext, { onConfigChange } = {}) {
       if (stopTicking) stopTicking();
       askButton.disabled = false;
       askButton.textContent = 'Ask';
+      syncSettingsVisibility();
     }
   }
 
@@ -12157,7 +12310,7 @@ function createDescribeStep(kb) {
       // below, so it stays correct without a full re-render (which would
       // lose the narrative textarea's caret mid-typing).
       function syncLlmButtons() {
-        const enabled = loadLlmConfig().enabled;
+        const enabled = remoteInferenceAvailable() && loadLlmConfig().enabled;
         draftButton.hidden = !enabled;
         suggestButton.hidden = !enabled;
         // The empty-proposals message also branches on this flag (see
@@ -12477,7 +12630,7 @@ function createDescribeStep(kb) {
           const empty = document.createElement('p');
           empty.className = 'proposals-empty';
           empty.textContent = textarea.value
-            ? loadLlmConfig().enabled
+            ? remoteInferenceAvailable() && loadLlmConfig().enabled
               ? 'Click "Read it" to scan the paragraph above, or "Suggest answers for what is left".'
               : 'Click "Read it" to scan the paragraph above.'
             : 'Nothing to scan yet.';
@@ -12823,9 +12976,14 @@ function createDescribeStep(kb) {
       // value the user chose.
       draftButton.addEventListener('click', async () => {
         const cfg = loadLlmConfig();
-        const provider = createOllamaProvider({ endpoint: cfg.endpoint, model: cfg.model });
+        const provider = createOllamaProvider({ endpoint: cfg.endpoint, model: cfg.model, token: cfg.token });
         if (!provider.isAvailable()) {
           if (showToast) showToast('Set a local model endpoint and name first (in "Ask about this step").');
+          return;
+        }
+        const limitStatus = rateLimitLabel();
+        if (limitStatus.atLimit) {
+          if (showToast) showToast(limitStatus.text);
           return;
         }
         const text = textarea.value.trim();
@@ -12837,6 +12995,7 @@ function createDescribeStep(kb) {
         draftButton.disabled = true;
         const stopTicking = startElapsedLabel(draftButton, 'Drafting');
         try {
+          recordOllamaRequest();
           const schema = buildProposalSchema(questionBank);
           const result = await provider.complete({
             system: OLLAMA_PROPOSAL_SYSTEM_PROMPT,
@@ -12891,9 +13050,14 @@ function createDescribeStep(kb) {
       // replace, keeping Accept boring.
       suggestButton.addEventListener('click', async () => {
         const cfg = loadLlmConfig();
-        const provider = createOllamaProvider({ endpoint: cfg.endpoint, model: cfg.model });
+        const provider = createOllamaProvider({ endpoint: cfg.endpoint, model: cfg.model, token: cfg.token });
         if (!provider.isAvailable()) {
           if (showToast) showToast('Set a local model endpoint and name first (in "Ask about this step").');
+          return;
+        }
+        const limitStatus = rateLimitLabel();
+        if (limitStatus.atLimit) {
+          if (showToast) showToast(limitStatus.text);
           return;
         }
         const text = textarea.value.trim();
@@ -12909,6 +13073,7 @@ function createDescribeStep(kb) {
         suggestButton.disabled = true;
         const stopTicking = startElapsedLabel(suggestButton, 'Asking');
         try {
+          recordOllamaRequest();
           const schema = buildProposalSchema(currentAskable);
           const result = await provider.complete({
             system: OLLAMA_PROPOSAL_SYSTEM_PROMPT,
