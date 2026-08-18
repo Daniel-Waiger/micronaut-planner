@@ -3946,6 +3946,61 @@ function kbMarker(kb, canonical) {
       : {};
   return markers[canonical];
 }
+  // ---- src/core/onboarding.js ----
+// Persisted onboarding state: which walkthrough stage the user is on, their
+// self-reported microscopy experience level, and whether onboarding has been
+// completed. Same idiom as llm/config.js's loadLlmConfig/saveLlmConfig --
+// localStorage read/written through a try/catch so a disabled/unavailable
+// localStorage degrades to defaults (unset) rather than throwing.
+//
+// Core module: pure logic only, no DOM, no engine/ui imports, no network.
+
+const STAGE_KEY = 'micronaut.onboarding.stage';
+const EXPERIENCE_KEY = 'micronaut.onboarding.experience';
+const COMPLETED_KEY = 'micronaut.onboarding.completed';
+
+const ONBOARDING_STAGES = ['idea', 'designing', 'acquiring'];
+const ONBOARDING_LEVELS = ['novice', 'occasional', 'frequent'];
+
+function onboardingReadLS(key, fallback) {
+  try {
+    const value = localStorage.getItem(key);
+    return value === null ? fallback : value;
+  } catch {
+    return fallback;
+  }
+}
+
+function onboardingWriteLS(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Persistence here is a convenience; a failed write only means the
+    // setting won't survive a reload.
+  }
+}
+
+function loadOnboarding() {
+  const storedStage = onboardingReadLS(STAGE_KEY, null);
+  const storedExperience = onboardingReadLS(EXPERIENCE_KEY, null);
+  return {
+    stage: ONBOARDING_STAGES.includes(storedStage) ? storedStage : null,
+    experience: ONBOARDING_LEVELS.includes(storedExperience) ? storedExperience : null,
+    completed: onboardingReadLS(COMPLETED_KEY, '0') === '1',
+  };
+}
+
+function saveOnboarding({ stage, experience, completed } = {}) {
+  if (typeof stage === 'string' && ONBOARDING_STAGES.includes(stage)) {
+    onboardingWriteLS(STAGE_KEY, stage);
+  }
+  if (typeof experience === 'string' && ONBOARDING_LEVELS.includes(experience)) {
+    onboardingWriteLS(EXPERIENCE_KEY, experience);
+  }
+  if (typeof completed === 'boolean') {
+    onboardingWriteLS(COMPLETED_KEY, completed ? '1' : '0');
+  }
+}
   // ---- src/core/router.js ----
 // Hash-based routing: #/step-id addresses the current step. Survives a page
 // reload by reading location.hash on init (falling back to the first step),
@@ -10200,6 +10255,64 @@ function saveLlmConfig({ enabled, endpoint, model, token, linkOuts }) {
   if (typeof token === 'string') writeLS(TOKEN_KEY, token);
   if (typeof linkOuts === 'boolean') writeLS(LINK_OUTS_KEY, linkOuts ? '1' : '0');
 }
+  // ---- src/llm/detect.js ----
+// Local Ollama server detection: a lightweight probe distinct from
+// ollama.js's complete() call path. Hits GET /api/tags (no body, no study
+// data ever leaves the machine) to answer "is a local Ollama server up, and
+// what models does it have loaded" so a caller can pre-populate a model
+// picker before the user commits to a provider.
+//
+// TOTAL discipline matches ollama.js: this function NEVER throws or rejects
+// for network reasons -- every failure mode (missing config, network error,
+// non-ok response, timeout/abort, malformed JSON) degrades to
+// { available: false, models: [] } so a caller can await it unconditionally.
+//
+// `fetchImpl` is injectable so this module is testable with a stub instead
+// of a running server (see web/tests/detect.test.js).
+
+const DETECT_DEFAULT_TIMEOUT_MS = 2000;
+
+async function detectOllama({ endpoint, fetchImpl, timeoutMs = DETECT_DEFAULT_TIMEOUT_MS } = {}) {
+  const doFetch = fetchImpl || (typeof fetch === 'function' ? fetch : undefined);
+
+  if (!endpoint || !doFetch) {
+    return { available: false, models: [] };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await doFetch(`${endpoint.replace(/\/+$/, '')}/api/tags`, {
+      method: 'GET',
+      signal: controller.signal,
+    });
+
+    if (!response || !response.ok) {
+      return { available: false, models: [] };
+    }
+
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      return { available: false, models: [] };
+    }
+
+    const rawModels = data && Array.isArray(data.models) ? data.models : [];
+    const names = rawModels
+      .map((m) => (m && typeof m.name === 'string' ? m.name : null))
+      .filter((name) => Boolean(name));
+    const uniqueSorted = Array.from(new Set(names)).sort();
+
+    return { available: true, models: uniqueSorted };
+  } catch {
+    // Network error, abort/timeout, or any other rejection from doFetch.
+    return { available: false, models: [] };
+  } finally {
+    clearTimeout(timer);
+  }
+}
   // ---- src/llm/manualPaste.js ----
 // The manual-paste provider: wraps today's copy-paste workflow behind the
 // same Provider interface (provider.js) a real network adapter uses, so the
@@ -11098,6 +11211,28 @@ function appendAdviceNote(list, note) {
  * rules themselves are surface-agnostic content; only the surface filter
  * applied at select time differs per panel.
  *
+ * `defaultExpanded` (default TRUE, zen-planner experience-verbosity slice):
+ * this panel previously had NO collapse mechanism of its own -- a plain
+ * <div>, always fully visible whenever it had notes (only `.hidden` toggled
+ * the whole section on/off, never an open/closed state for existing notes).
+ * Rather than invent a bespoke toggle, it now reuses the SAME native
+ * <details>/<summary> "reveal" idiom already shared by describe.js's/
+ * panel.js's "Get AI help"/"Your answers" sections (see app.css's `.reveal`
+ * comment) -- one progressive-disclosure mechanism app-wide, not two.
+ * `defaultExpanded` sets the details element's initial `open` state.
+ *
+ * Defaults to TRUE deliberately, not false: this is guidance content
+ * (pitfalls/tips, sometimes safety-relevant -- spectral spillover,
+ * photobleaching), and every caller that does not yet thread an experience
+ * level through (describe.js, design.js, naming.js -- only panel.js does,
+ * see below) must keep today's always-visible behavior unchanged, since
+ * `experience` reads `null` for the app's entire existing userbase (the
+ * onboarding gate only ever fires on a session with zero prior autosaves --
+ * see core/onboarding.js / main.js). A caller opts INTO collapsing, it is
+ * never the silent default -- panel.js is the one caller that does, and
+ * only for an explicit 'frequent' self-report, not for 'novice' or an
+ * absent/unset experience level.
+ *
  * Returns { element, update(experiment) }. Mount `element` once, at render
  * time, in the step's own DOM tree (main.textContent = '' wipes the whole
  * step on every navigation, so there is nothing to persist across renders --
@@ -11107,13 +11242,14 @@ function appendAdviceNote(list, note) {
  * could have changed -- there is no store subscription here (see the
  * module-header comment on caching).
  */
-function createAdvicePanel(advisor, surface) {
-  const section = document.createElement('div');
-  section.className = 'advice-section';
+function createAdvicePanel(advisor, surface, { defaultExpanded = true } = {}) {
+  const section = document.createElement('details');
+  section.className = 'advice-section reveal';
+  section.open = defaultExpanded;
   section.hidden = true; // no advice yet -- see update() below
 
-  const heading = document.createElement('div');
-  heading.className = 'advice-heading';
+  const heading = document.createElement('summary');
+  heading.className = 'advice-heading reveal-summary';
   heading.textContent = 'Guidance';
   section.appendChild(heading);
 
@@ -11284,6 +11420,23 @@ function createGuidancePanel(getContext, { onConfigChange } = {}) {
   modelInput.placeholder = 'model name, e.g. llama3.1:8b';
   settingsRow.appendChild(modelInput);
 
+  // Populated from detectOllama() when a local server answers at the
+  // currently-configured endpoint; hidden (and modelInput shown instead)
+  // whenever detection finds nothing -- no server, available:false, or a
+  // remote/non-default endpoint the probe can't reach. This keeps the panel
+  // usable via free text no matter what detection does, per this task's
+  // degrade-gracefully requirement.
+  const modelSelect = document.createElement('select');
+  modelSelect.className = 'guidance-model guidance-model-select';
+  modelSelect.hidden = true;
+  settingsRow.appendChild(modelSelect);
+
+  const modelDetectedHint = document.createElement('span');
+  modelDetectedHint.className = 'guidance-model-detected-hint';
+  modelDetectedHint.textContent = ' (detected)';
+  modelDetectedHint.hidden = true;
+  settingsRow.appendChild(modelDetectedHint);
+
   // Only needed for a gated gateway (the "unit server" case) sitting in
   // front of Ollama; a bare LAN Ollama box takes no token. Blank means "send
   // no Authorization header at all" (llm/ollama.js), not "send an empty
@@ -11324,12 +11477,25 @@ function createGuidancePanel(getContext, { onConfigChange } = {}) {
   rateLimitHint.className = 'guidance-hint guidance-rate-limit-hint';
   section.appendChild(rateLimitHint);
 
+  // True once detectOllama() has found a reachable server WITH at least one
+  // model at the currently-configured endpoint; false any time detection is
+  // pending, failed, or found nothing (available:false, or a remote/
+  // non-default endpoint the probe can't reach) -- the text input is always
+  // the fallback, never a dead end.
+  let modelDetected = false;
+
+  function currentModelValue() {
+    return modelDetected ? modelSelect.value : modelInput.value;
+  }
+
   function syncSettingsVisibility() {
     const remoteOk = remoteInferenceAvailable();
     settingsRow.hidden = !remoteOk;
     remoteUnavailableNotice.hidden = remoteOk;
     endpointInput.hidden = !enabledCheckbox.checked;
-    modelInput.hidden = !enabledCheckbox.checked;
+    modelInput.hidden = !enabledCheckbox.checked || modelDetected;
+    modelSelect.hidden = !enabledCheckbox.checked || !modelDetected;
+    modelDetectedHint.hidden = !enabledCheckbox.checked || !modelDetected;
     tokenInput.hidden = !enabledCheckbox.checked;
     coldStartHint.hidden = !remoteOk || !enabledCheckbox.checked;
     rateLimitHint.hidden = !remoteOk || !enabledCheckbox.checked;
@@ -11347,7 +11513,7 @@ function createGuidancePanel(getContext, { onConfigChange } = {}) {
     saveLlmConfig({
       enabled: enabledCheckbox.checked,
       endpoint: endpointInput.value,
-      model: modelInput.value,
+      model: currentModelValue(),
       token: tokenInput.value,
     });
     syncSettingsVisibility();
@@ -11356,7 +11522,48 @@ function createGuidancePanel(getContext, { onConfigChange } = {}) {
   enabledCheckbox.addEventListener('change', persistSettings);
   endpointInput.addEventListener('change', persistSettings);
   modelInput.addEventListener('change', persistSettings);
+  modelSelect.addEventListener('change', persistSettings);
   tokenInput.addEventListener('change', persistSettings);
+
+  // Probe the currently-configured endpoint for a local Ollama server and,
+  // if one answers with at least one model, swap the free-text model input
+  // for a <select> listing them (pre-selecting the configured model when
+  // it's in the list). Runs on mount and again whenever the endpoint field
+  // changes (its own 'change' listener above already persists the new
+  // endpoint first). detectOllama() is TOTAL -- it never throws or hangs
+  // past its own timeout -- so this can never block the panel; on any
+  // non-detection outcome the text input is left exactly as it was.
+  let detectionToken = 0;
+  async function runDetection() {
+    const endpointAtStart = endpointInput.value;
+    const myToken = ++detectionToken;
+    const result = await detectOllama({ endpoint: endpointAtStart });
+    // Drop a stale response: either a newer detection superseded this one,
+    // or the endpoint field has since changed again.
+    if (myToken !== detectionToken || endpointInput.value !== endpointAtStart) return;
+
+    if (result.available && result.models.length > 0) {
+      const wanted = currentModelValue();
+      modelSelect.textContent = '';
+      for (const name of result.models) {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        modelSelect.appendChild(option);
+      }
+      modelSelect.value = result.models.includes(wanted) ? wanted : result.models[0];
+      modelDetected = true;
+    } else {
+      modelDetected = false;
+    }
+    persistSettings();
+  }
+  endpointInput.addEventListener('change', () => {
+    runDetection();
+  });
+  // Fire-and-forget on mount: intentionally not awaited so the panel is
+  // interactive immediately via the text input while detection runs.
+  runDetection();
 
   const questionInput = document.createElement('input');
   questionInput.type = 'text';
@@ -11463,6 +11670,78 @@ function createGuidancePanel(getContext, { onConfigChange } = {}) {
   copyButton.addEventListener('click', () => copyToClipboard(pasteBox.value));
 
   return { element: section, update() {} };
+}
+  // ---- src/ui/aiAssist.js ----
+// The AI Assist shell (zen-planner "one door" consolidation): a SINGLE
+// collapsible <details> that houses every LLM-related entry point a step
+// might offer, instead of each one exploding across the page as its own
+// section. This module owns layout/composition only -- it does not know
+// what a "draft" or a "chat prompt" is.
+//
+// This is a SHELL component, nothing more. It:
+//   (a) mounts guidance.js's "Ask about this step" panel (capability A:
+//       read-only, never writes to the store; its model field now
+//       self-detects a local Ollama server -- see guidance.js);
+//   (b) reserves an empty `.actionsContainer` slot for Draft/Suggest-style
+//       buttons;
+//   (c) reserves an empty `.chatContainer` slot for the copy-prompt/
+//       link-out chat-LLM section.
+//
+// describe.js currently owns the Draft/Suggest/chat-LLM logic directly on
+// its own page. Wiring that existing logic into `.actionsContainer` /
+// `.chatContainer` (moving it, not duplicating it) is a SEPARATE task (D1)
+// -- describe.js is off-limits here, so this module does not and cannot
+// reach into it. Until D1 lands, the two containers are simply empty.
+//
+// Same reveal/reveal-summary idiom describe.js already uses for its own
+// "Get AI help (optional)" details (see describe.js's aiHelpDetails
+// comment): closed by default, and nothing here ever forces it back closed
+// once a user has opened it.
+
+
+/**
+ * `getGuidanceContext()` is passed straight through to createGuidancePanel
+ * as its `getContext` argument -- same contract: called fresh at ASK time,
+ * must return `{doc, questions}`. `onConfigChange`, if given, is forwarded
+ * to createGuidancePanel's own `onConfigChange` option so a caller (D1) can
+ * still react to the enabled/endpoint/model settings changing (e.g. to show
+ * its Draft/Suggest buttons once local-model use is turned on) without this
+ * shell needing to know why.
+ *
+ * Returns `{element, update(), actionsContainer, chatContainer}` --
+ * `{element, update()}` matches the mount-panel shape used elsewhere in
+ * ui/ (createGuidancePanel, createAdvicePanel); `actionsContainer` and
+ * `chatContainer` are the two slots described above, for the caller to
+ * populate and manage on its own.
+ */
+function createAiAssistPanel({ getGuidanceContext, onConfigChange } = {}) {
+  const details = document.createElement('details');
+  details.className = 'reveal aiassist-shell';
+
+  const summary = document.createElement('summary');
+  summary.className = 'reveal-summary';
+  summary.textContent = 'Get AI help (optional)';
+  details.appendChild(summary);
+
+  const guidancePanel = createGuidancePanel(getGuidanceContext || (() => ({})), { onConfigChange });
+  details.appendChild(guidancePanel.element);
+
+  const actionsContainer = document.createElement('div');
+  actionsContainer.className = 'aiassist-actions';
+  details.appendChild(actionsContainer);
+
+  const chatContainer = document.createElement('div');
+  chatContainer.className = 'aiassist-chatllm';
+  details.appendChild(chatContainer);
+
+  return {
+    element: details,
+    actionsContainer,
+    chatContainer,
+    update() {
+      guidancePanel.update();
+    },
+  };
 }
   // ---- src/ui/questionControl.js ----
 // Shared question-control builder: the DOM control for one interview
@@ -11659,6 +11938,71 @@ function coerceAnswer(question, raw) {
 // nothing about the store, scopeWrite, or provenance.
 
 
+// Novice-only "Not sure? Help me choose" expanders (zen-planner
+// experience-verbosity slice), keyed by the question's `field` path -- NOT
+// its `id`, since `field` is the stable cross-file join key (see
+// engine/interview.js's questions.json contract and lesson 50 in
+// docs/cma-lessons.md: writing/reading two different key spaces for the
+// "same" thing is exactly the silent-disconnect shape). Exactly three
+// fields get one, chosen because they are the highest-leverage/least
+// self-explanatory boxes on this step for a first-time user.
+//
+// modality's text is compressed from web/kb/advisor.json's existing rule
+// bodies (sted-photostability, sted-pixel-nyquist, confocal-pinhole,
+// confocal-sequential-scanning, widefield-thick-sample-blur,
+// widefield-live-cell-strength, lightsheet-data-volume,
+// em-markers-are-contrast-agents, raman-label-free-tradeoff) -- no new
+// domain facts, just a compact contrast of what's already there.
+// smallestFeatureNm's Nyquist-sampling sentence is compressed from
+// advisor.json's `smallest-feature-pixel-size` rule; the nanometer
+// reference figures below it are a plain factual explainer NOT sourced
+// from the KB (advisor.json has no rule with concrete magnitude figures).
+// instrument has NO advisor.json coverage at all (grepped, zero rules key
+// on acquisition.instrument) -- its text is a plain factual explainer,
+// also NOT KB-sourced.
+const FIELD_CHOOSER_HELP = {
+  'acquisition.modality':
+    'Confocal is the default choice for most fixed or live samples -- a good balance of speed and optical sectioning. ' +
+    'STED trades speed and dye photostability for much higher (tens-of-nanometer) resolution, worth it only if you ' +
+    'truly need sub-diffraction detail. Widefield has no optical sectioning but is gentler on dim, photosensitive, or ' +
+    "fast live samples; light-sheet suits large or long-timelapse specimens. SEM/TEM (structural, contrast-agent " +
+    "based) and Raman (label-free, chemical) answer questions a fluorescence microscope can't.",
+  'acquisition.smallestFeatureNm':
+    // NOT sourced from advisor.json beyond the first sentence -- see the
+    // module comment above.
+    'This is the smallest structure you actually need to see clearly, in nanometers -- set it BEFORE choosing a pixel ' +
+    'size, since a good pixel size is roughly 2-3x finer than this number (Nyquist sampling), not the other way ' +
+    'around. For reference, whole cells run roughly 10,000-20,000 nm, organelles like mitochondria roughly ' +
+    '500-1,000 nm, and individual protein clusters can be under 100 nm -- that last scale usually needs a ' +
+    'super-resolution technique like STED to resolve at all.',
+  'acquisition.instrument':
+    // Entirely NOT sourced from advisor.json -- no existing rule keys on
+    // acquisition.instrument (verified by grep).
+    "This is the specific microscope model or setup (e.g. \"Leica SP8\", \"Zeiss LSM 900\", \"JEOL SEM\"), not the " +
+    'general modality above. Naming it precisely lets this app (and anyone reading your notes later) look up its ' +
+    "exact objectives, lasers, and detectors instead of guessing. If you don't know the exact model, check the " +
+    "instrument's nameplate or ask your facility manager -- it's fine to leave this blank and fill it in later.",
+};
+
+function appendChooserHelp(cell, question) {
+  const helpText = FIELD_CHOOSER_HELP[question.field];
+  if (!helpText) return;
+  // Same native <details>/<summary> "reveal" idiom as advice.js and
+  // describe.js's "Get AI help" section -- one progressive-disclosure
+  // mechanism, not a bespoke toggle.
+  const details = document.createElement('details');
+  details.className = 'reveal field-chooser-help';
+  const summary = document.createElement('summary');
+  summary.className = 'reveal-summary';
+  summary.textContent = 'Not sure? Help me choose';
+  details.appendChild(summary);
+  const body = document.createElement('p');
+  body.className = 'proposals-empty';
+  body.textContent = helpText;
+  details.appendChild(body);
+  cell.appendChild(details);
+}
+
 /**
  * Render `questions` into `container` as a field grid.
  *
@@ -11666,8 +12010,16 @@ function coerceAnswer(question, raw) {
  * with the box's current value -- the caller writes it (STRONG) and is
  * expected to re-render so `confirmed` flips. An empty box is a no-op: an
  * unfilled field is a skipped question, never a committed blank.
+ *
+ * `experience` ('novice' | 'occasional' | 'frequent' | null | undefined,
+ * zen-planner experience-verbosity slice) is threaded straight from the
+ * step's own render(ctx) call, same as advice.js's defaultExpanded --
+ * ONLY 'novice' renders the small "Not sure? Help me choose" expander
+ * beneath the handful of fields in FIELD_CHOOSER_HELP above; every other
+ * value (including the pre-onboarding null default) renders exactly as
+ * before this slice.
  */
-function renderFieldInterview(container, { questions, onCommit } = {}) {
+function renderFieldInterview(container, { questions, onCommit, experience } = {}) {
   container.textContent = '';
   const list = Array.isArray(questions) ? questions : [];
 
@@ -11728,6 +12080,7 @@ function renderFieldInterview(container, { questions, onCommit } = {}) {
     commitRow.appendChild(commitBtn);
 
     cell.appendChild(commitRow);
+    if (experience === 'novice') appendChooserHelp(cell, question);
     grid.appendChild(cell);
   }
 }
@@ -12257,24 +12610,31 @@ function createDescribeStep(kb) {
       readButton.textContent = 'Read it';
       main.appendChild(readButton);
 
-      // Progressive disclosure (zen-planner Phase 1's declutter pass): every
-      // LLM-related control -- the two Ollama-specific buttons below, plus
-      // the chat-LLM round-trip section further down -- collapses behind
-      // ONE reveal instead of exploding across the page by default. Closed
-      // by default: nothing about the deterministic "Read it" scan above
-      // needs it, and a first-time visitor with no local model configured
-      // has no reason to see three LLM options before they've typed a
-      // sentence. `open` is never forced true by anything below -- once the
-      // user opens it, JS never closes it back (no code here sets
-      // aiHelpDetails.open), so their choice survives every re-render this
-      // function itself does NOT trigger a fresh mount for.
-      const aiHelpDetails = document.createElement('details');
-      aiHelpDetails.className = 'reveal';
-      const aiHelpSummary = document.createElement('summary');
-      aiHelpSummary.className = 'reveal-summary';
-      aiHelpSummary.textContent = 'Get AI help (optional)';
-      aiHelpDetails.appendChild(aiHelpSummary);
-      main.appendChild(aiHelpDetails);
+      // Progressive disclosure (zen-planner Phase 1's declutter pass, folded
+      // into the "one door" aiAssist.js consolidation for D1): every
+      // LLM-related control on this step -- the guidance panel's "ask about
+      // this step", the two Ollama-specific buttons below, and the chat-LLM
+      // round-trip section further down -- lives inside the ONE
+      // createAiAssistPanel shell instead of exploding across the page or
+      // duplicating its own separate reveal/guidance mount. Closed by
+      // default: nothing about the deterministic "Read it" scan above needs
+      // it, and a first-time visitor with no local model configured has no
+      // reason to see three LLM options before they've typed a sentence.
+      // `getGuidanceContext` mirrors the old standalone guidancePanel's
+      // getContext exactly (see currentAskable below, populated by
+      // renderInterview on every call) -- called fresh at Ask time, not
+      // captured once here. `onConfigChange` is still how ticking the
+      // enabled checkbox reveals draftButton/suggestButton without a full
+      // re-render (see syncLlmButtons below).
+      let currentAskable = [];
+      const aiAssistPanel = createAiAssistPanel({
+        getGuidanceContext: () => ({
+          doc: buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE),
+          questions: currentAskable,
+        }),
+        onConfigChange: () => syncLlmButtons(),
+      });
+      main.appendChild(aiAssistPanel.element);
 
       // Only offered when a local model is actually configured -- the draft
       // flow needs schema-constrained decoding, which the manual-paste
@@ -12287,7 +12647,7 @@ function createDescribeStep(kb) {
       draftButton.textContent = 'Draft a study from this (new tab)';
       draftButton.title =
         'Sends this description to your local model and opens the drafted study in a NEW tab. This study is not touched.';
-      aiHelpDetails.appendChild(draftButton);
+      aiAssistPanel.actionsContainer.appendChild(draftButton);
 
       // Wave C: the same model, aimed at THIS study instead of a new one.
       // The two are different moments, not redundant buttons -- drafting is
@@ -12299,16 +12659,16 @@ function createDescribeStep(kb) {
       suggestButton.textContent = 'Suggest answers for what is left';
       suggestButton.title =
         "Asks your local model to answer only the questions you haven't decided yet, as proposals you review one by one.";
-      aiHelpDetails.appendChild(suggestButton);
+      aiAssistPanel.actionsContainer.appendChild(suggestButton);
 
       // Both buttons above are Ollama-specific (they need schema-constrained
       // decoding -- see draftButton's title). Their visibility used to be
       // set ONCE here from loadLlmConfig().enabled at render() time, so
-      // ticking the checkbox in the guidance panel below did not reveal them
-      // until the step re-rendered -- a real, user-reported bug. This is
-      // called at initial render AND from guidancePanel's onConfigChange
-      // below, so it stays correct without a full re-render (which would
-      // lose the narrative textarea's caret mid-typing).
+      // ticking the checkbox in the aiAssistPanel's guidance panel did not
+      // reveal them until the step re-rendered -- a real, user-reported bug.
+      // This is called at initial render AND from aiAssistPanel's
+      // onConfigChange above, so it stays correct without a full re-render
+      // (which would lose the narrative textarea's caret mid-typing).
       function syncLlmButtons() {
         const enabled = remoteInferenceAvailable() && loadLlmConfig().enabled;
         draftButton.hidden = !enabled;
@@ -12555,7 +12915,7 @@ function createDescribeStep(kb) {
         mergeProposals(proposals, { sourceLabel: 'an earlier suggestion' });
       });
 
-      aiHelpDetails.appendChild(chatSection);
+      aiAssistPanel.chatContainer.appendChild(chatSection);
 
       // advisor may be undefined (a caller that hasn't wired it, or a KB
       // that failed to load) -- createAdvicePanel([], ...) is completely
@@ -12569,18 +12929,10 @@ function createDescribeStep(kb) {
       }
 
       // Guidance (local-llm-guidance): read-only, opt-in "ask about this
-      // step" panel. `currentAskable` is refreshed by renderInterview below
-      // on every call, so getContext() always reflects whatever the user is
-      // actually looking at, not a snapshot from when the panel mounted.
-      let currentAskable = [];
-      const guidancePanel = createGuidancePanel(
-        () => ({
-          doc: buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE),
-          questions: currentAskable,
-        }),
-        { onConfigChange: () => syncLlmButtons() }
-      );
-      main.appendChild(guidancePanel.element);
+      // step" panel, now owned by aiAssistPanel above (its `getGuidanceContext`
+      // uses this same `currentAskable`, refreshed by renderInterview below on
+      // every call, so the panel always reflects whatever the user is actually
+      // looking at, not a snapshot from when it mounted).
 
       const proposalsHeading = document.createElement('div');
       proposalsHeading.className = 'proposals-heading';
@@ -12600,11 +12952,11 @@ function createDescribeStep(kb) {
       interviewList.className = 'interview-list';
       main.appendChild(interviewList);
 
-      // Collapsed by default, same reveal idiom as aiHelpDetails above: a
-      // review list of everything already answered is valuable once there
-      // is something to review, but is pure clutter above the fold on a
-      // step that has not been touched yet -- see the declutter comment on
-      // aiHelpDetails for the full rationale.
+      // Collapsed by default, same reveal idiom as aiAssistPanel's shell
+      // above: a review list of everything already answered is valuable
+      // once there is something to review, but is pure clutter above the
+      // fold on a step that has not been touched yet -- see the declutter
+      // comment on aiAssistPanel above for the full rationale.
       const answeredDetails = document.createElement('details');
       answeredDetails.className = 'reveal';
       const answeredSummary = document.createElement('summary');
@@ -13991,58 +14343,23 @@ const guideStep = {
       section(main, 'The steps', (c) => {
         para(
           c,
-          'Use the steps in the left nav in any order — the app works outside-in, so you can ' +
-            'jump straight to whatever you want to fill in. A study can hold several assays; the ' +
-            'row of tabs at the top switches between them (and adds or removes them).'
+          'For a guided on-ramp, start at Home — it offers the walkthrough, starting from a ' +
+            'description, and the worked example. This list is a quick reference for what each ' +
+            'step in the left nav means. Use the steps in any order — the app works outside-in — ' +
+            'and note a study can hold several assays, switched with the tab row at the top.'
         );
         defList(c, [
-          [
-            'Home',
-            'The landing page: three doors in — start from a description, start from the worked ' +
-              'example, or take the guided tour. Also where "Take the walkthrough" lives if you ' +
-              'skipped it the first time.',
-          ],
-          [
-            'Project',
-            'Per assay: the question first — pick the readout you are actually measuring ' +
-              '(viability, cytoskeleton, ROS, migration, …), your organism/cell line, sample type, ' +
-              'and preparation, before any microscope decision. Optional AI help (off by default) ' +
-              'lives in a collapsed "Get AI help" section here.',
-          ],
-          [
-            'Study',
-            'The study-wide view: your research question, the group vocabulary shared across ' +
-              'assays (e.g. control vs. treatment), and the list of assays. Rename or add assays here.',
-          ],
-          [
-            'Design',
-            'Per assay: your control and treatment groups as individual named boxes, any crossing ' +
-              'factors, and biological/technical replicate counts.',
-          ],
+          ['Home', 'Landing page: walkthrough, description, or worked example.'],
+          ['Project', 'Per assay: readout, organism/cell line, sample type, preparation.'],
+          ['Study', 'Study-wide question, shared group vocabulary, and assay list.'],
+          ['Design', 'Per assay: control/treatment groups, crossing factors, replicate counts.'],
           [
             'Microscopy',
-            'Per assay: instrument, modality, magnification, and markers, asked as a grid of short ' +
-              'boxes — fill one in and click its ✓ to confirm; leave it blank to skip. Below that, ' +
-              'a qualitative spectral-spillover check across the markers you entered, with detection ' +
-              'filter bands overlaid automatically. An optional structured panel editor lets you name ' +
-              'each channel’s target and how its fluorophore is attached (direct antibody, indirect, ' +
-              'genetically encoded, a direct-binding probe, or a self-labeling tag) — more precise ' +
-              'than the markers field, and what tells Overview whether an antibody is actually involved.',
+            'Per assay: instrument, modality, magnification, markers, spectral-overlap check, ' +
+              'and an optional panel editor.',
           ],
-          [
-            'Naming',
-            'The filename template and the field values it fills — assembled from the design, so you ' +
-              'rarely type a filename by hand. Further down, a Schedule section: roughly how long each ' +
-              'bench/microscope task takes for you, and a one-click download of a bench schedule ' +
-              '(.ics) that imports into Google Calendar, Outlook, or Apple Calendar with no login.',
-          ],
-          [
-            'Overview',
-            'A read-only summary of the whole study: a visual study map, a conformance check (one ' +
-              'pass/fail verdict for the whole study), the recommended controls, a step-by-step ' +
-              '“how to run this project” ladder, and every planned filename. Nothing is entered ' +
-              'here — it reads from the other steps.',
-          ],
+          ['Naming', 'Filename template and fields, plus the bench-schedule (.ics) export.'],
+          ['Overview', 'Read-only summary: study map, conformance check, controls, filenames.'],
         ]);
       })
     );
@@ -14291,8 +14608,294 @@ const homeStep = {
     });
     skipRow.appendChild(skipLink);
     main.appendChild(skipRow);
+
+    const guideRow = document.createElement('p');
+    guideRow.className = 'home-skip-row';
+    const guideLink = document.createElement('button');
+    guideLink.type = 'button';
+    guideLink.className = 'home-skip-link';
+    guideLink.textContent = 'Looking for a specific term or step? See the Guide.';
+    guideLink.addEventListener('click', () => {
+      if (router) router.navigate('guide');
+    });
+    guideRow.appendChild(guideLink);
+    main.appendChild(guideRow);
   },
 };
+  // ---- src/ui/steps/onboarding.js ----
+// First-run onboarding gate (zen-planner Phase B2): a two-screen chooser
+// shown once, before a genuinely new session settles on a landing page --
+// "where are you in your project?" then a lighter "how familiar are you
+// with this?" -- so the app can route a brand-new visitor straight to the
+// step that matches their situation instead of dropping everyone on the
+// same Guide page regardless of context.
+//
+// Implementation shape: a document.body overlay (same idiom as
+// ../walkthrough.js's backdrop + centered dialog), NOT a router step. A
+// router step would need an entry in main.js's `steps` array, and shell.js
+// renders one permanent nav icon per entry in that array with no
+// guard-based hiding -- so a step would leave a stray "onboarding" button in
+// the nav forever after the gate is dismissed once. An overlay needs no
+// change to shell.js/app.css: it is appended straight to document.body,
+// reuses existing CSS classes (walkthrough-backdrop for the dim background;
+// home-card/-icon/-title/-body for the choice buttons; step-heading/
+// proposals-empty for text; home-skip-row/-link for the Skip control) via
+// class names alone, plus a handful of inline positioning styles for the
+// centered dialog box itself (app.css has no "centered modal" class to
+// reuse, and this task's file allowlist does not include app.css).
+//
+// No innerHTML anywhere -- createElement/textContent only, matching the
+// hard rule already followed by walkthrough.js and every other ui/ module.
+
+
+// The fourth choice is deliberately NOT one of core/onboarding.js's
+// ONBOARDING_STAGES ('idea'/'designing'/'acquiring') -- it is a routing
+// shortcut to the Naming step for someone who is past study design
+// entirely, not a fourth project stage. saveOnboarding() only persists a
+// `stage` string that is in ONBOARDING_STAGES, so this choice's `stage`
+// stays null and is simply never written; see completeWith() below.
+const STAGE_CHOICES = [
+  {
+    stage: 'idea',
+    icon: '\u{1F4A1}',
+    title: 'Just an idea',
+    body: 'Not sure where to start yet -- take an interactive tour of the app.',
+  },
+  {
+    stage: 'designing',
+    icon: '\u{1F9EA}',
+    title: 'Designing my study',
+    body: 'I know roughly what I am testing and need to work out the design.',
+  },
+  {
+    stage: 'acquiring',
+    icon: '\u{1F52C}',
+    title: 'Ready to acquire images',
+    body: 'The study design is set -- I need to plan the microscopy acquisition.',
+  },
+  {
+    stage: null,
+    routeId: 'naming',
+    icon: '\u{1F5C2}\u{FE0F}',
+    title: 'I already have images',
+    body:
+      'I need to name existing files. Note: this app does not read or extract metadata from image files -- it only helps you build a consistent naming convention by hand.',
+  },
+];
+
+const EXPERIENCE_LABELS = {
+  novice: {
+    title: 'Novice',
+    body: "I'm new to microscopy, or new to planning an experiment like this.",
+  },
+  occasional: {
+    title: 'Occasional',
+    body: "I've done this before, but not often.",
+  },
+  frequent: {
+    title: 'Frequent',
+    body: 'I do this regularly and know my way around.',
+  },
+};
+
+function choiceCard(parent, { icon, title, body, onClick }) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'home-card';
+  button.addEventListener('click', onClick);
+
+  const iconSpan = document.createElement('span');
+  iconSpan.className = 'home-card-icon';
+  iconSpan.setAttribute('aria-hidden', 'true');
+  iconSpan.textContent = icon;
+  button.appendChild(iconSpan);
+
+  const titleSpan = document.createElement('span');
+  titleSpan.className = 'home-card-title';
+  titleSpan.textContent = title;
+  button.appendChild(titleSpan);
+
+  const bodySpan = document.createElement('span');
+  bodySpan.className = 'home-card-body';
+  bodySpan.textContent = body;
+  button.appendChild(bodySpan);
+
+  parent.appendChild(button);
+  return button;
+}
+
+/**
+ * Show the first-run onboarding gate. `router` drives navigation to the
+ * step matching whatever the user picks (or launches the interactive
+ * walkthrough for the "idea" choice); `onDone()` (optional) fires once the
+ * gate is dismissed by any path (a completed choice, or Skip) -- main.js
+ * does not currently need it (it drives the destination step itself via
+ * `router`), but is accepted for symmetry with ../walkthrough.js's
+ * `onFinish` and so a future caller can hook completion without editing
+ * this module's internals.
+ *
+ * Renders nothing into the router-managed `main` element: the overlay is
+ * appended to document.body and manages its own teardown, same as
+ * startWalkthrough().
+ */
+function showOnboardingGate({ router, onDone } = {}) {
+  let chosen = null;
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'walkthrough-backdrop';
+
+  const dialog = document.createElement('div');
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('aria-label', 'Get started');
+  dialog.style.position = 'fixed';
+  dialog.style.left = '50%';
+  dialog.style.top = '50%';
+  dialog.style.transform = 'translate(-50%, -50%)';
+  dialog.style.zIndex = '202';
+  dialog.style.width = 'min(560px, calc(100vw - 32px))';
+  dialog.style.maxHeight = 'calc(100vh - 64px)';
+  dialog.style.overflowY = 'auto';
+  dialog.style.background = 'var(--panel)';
+  dialog.style.border = '1px solid var(--line)';
+  dialog.style.borderRadius = '12px';
+  dialog.style.padding = '24px';
+  dialog.style.boxShadow = '0 8px 28px rgb(0 0 0 / 35%)';
+
+  function teardown() {
+    window.removeEventListener('keydown', onKeydown);
+    backdrop.remove();
+    dialog.remove();
+  }
+
+  function skip() {
+    saveOnboarding({ completed: true });
+    teardown();
+    if (typeof onDone === 'function') onDone();
+  }
+
+  function onKeydown(event) {
+    if (event.key === 'Escape') skip();
+  }
+
+  function completeWith(experience) {
+    const payload = { experience, completed: true };
+    if (chosen && chosen.stage) payload.stage = chosen.stage;
+    saveOnboarding(payload);
+    teardown();
+    const destination =
+      chosen && chosen.stage === 'designing'
+        ? 'describe'
+        : chosen && chosen.stage === 'acquiring'
+          ? 'panel'
+          : chosen && chosen.routeId;
+    if (router && destination) router.navigate(destination);
+    if (typeof onDone === 'function') onDone();
+  }
+
+  function renderExperienceScreen() {
+    dialog.textContent = '';
+
+    const heading = document.createElement('h2');
+    heading.className = 'step-heading';
+    heading.textContent = 'How familiar are you with this?';
+    dialog.appendChild(heading);
+
+    const subheading = document.createElement('p');
+    subheading.className = 'proposals-empty';
+    subheading.textContent = 'This only shapes how much explanation the app shows -- you can change it later.';
+    dialog.appendChild(subheading);
+
+    const list = document.createElement('div');
+    list.style.display = 'flex';
+    list.style.flexDirection = 'column';
+    list.style.gap = '12px';
+    list.style.margin = '20px 0';
+    dialog.appendChild(list);
+
+    for (const level of ONBOARDING_LEVELS) {
+      const label = EXPERIENCE_LABELS[level] || { title: level, body: '' };
+      choiceCard(list, {
+        icon: '',
+        title: label.title,
+        body: label.body,
+        onClick: () => completeWith(level),
+      });
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'walkthrough-actions';
+    const backBtn = document.createElement('button');
+    backBtn.type = 'button';
+    backBtn.className = 'walkthrough-back';
+    backBtn.textContent = 'Back';
+    backBtn.addEventListener('click', renderStageScreen);
+    actions.appendChild(backBtn);
+    dialog.appendChild(actions);
+  }
+
+  function renderStageScreen() {
+    chosen = null;
+    dialog.textContent = '';
+
+    const heading = document.createElement('h2');
+    heading.className = 'step-heading';
+    heading.textContent = 'Where are you in your project?';
+    dialog.appendChild(heading);
+
+    const subheading = document.createElement('p');
+    subheading.className = 'proposals-empty';
+    subheading.textContent = "Pick whichever is closest -- this decides where Micronaut starts you off.";
+    dialog.appendChild(subheading);
+
+    const list = document.createElement('div');
+    list.style.display = 'flex';
+    list.style.flexDirection = 'column';
+    list.style.gap = '12px';
+    list.style.margin = '20px 0';
+    dialog.appendChild(list);
+
+    for (const choice of STAGE_CHOICES) {
+      choiceCard(list, {
+        icon: choice.icon,
+        title: choice.title,
+        body: choice.body,
+        onClick: () => {
+          if (choice.stage === 'idea') {
+            saveOnboarding({ stage: 'idea', experience: 'novice', completed: true });
+            teardown();
+            startWalkthrough({
+              router,
+              onFinish: () => {
+                if (typeof onDone === 'function') onDone();
+              },
+            });
+            return;
+          }
+          chosen = choice;
+          renderExperienceScreen();
+        },
+      });
+    }
+
+    const skipRow = document.createElement('p');
+    skipRow.className = 'home-skip-row';
+    const skipLink = document.createElement('button');
+    skipLink.type = 'button';
+    skipLink.className = 'home-skip-link';
+    skipLink.textContent = 'Skip for now';
+    skipLink.addEventListener('click', skip);
+    skipRow.appendChild(skipLink);
+    dialog.appendChild(skipRow);
+  }
+
+  backdrop.addEventListener('click', skip);
+  window.addEventListener('keydown', onKeydown);
+
+  document.body.appendChild(backdrop);
+  document.body.appendChild(dialog);
+  renderStageScreen();
+}
   // ---- src/ui/steps/overview.js ----
 // The Overview step: the shareable study diagram + the deterministic,
 // no-LLM textual walkthrough (engine/studydoc.js -- one document model,
@@ -15612,7 +16215,7 @@ function createPanelStep(kb) {
     // -- get decided, after Project and before Outputs. The id stays
     // 'panel' (URL hash, every render() call site) -- label only.
     title: 'Microscopy',
-    render(main, store, { advisor } = {}) {
+    render(main, store, { advisor, experience } = {}) {
       // Commit 1 of the assay tier idiom (naming.js/design.js/describe.js
       // all cache this identically): the active assay never changes for the
       // lifetime of one render/paint -- shared by the interview AND the
@@ -15647,6 +16250,7 @@ function createPanelStep(kb) {
         main.appendChild(interviewContainer);
         renderFieldInterview(interviewContainer, {
           questions: phaseQuestions(questionBank, assayView(store.get(), assayId), 'microscopy'),
+          experience,
           onCommit: (question, raw) => {
             const { path, slotKey } = scopeWrite(store.get(), question.field, assayId);
             const existingTag = store.get().provenance?.slots?.[slotKey]?.tag ?? null;
@@ -16162,7 +16766,13 @@ function createPanelStep(kb) {
       renderChannelsList();
       refreshSpectralView();
 
-      const advicePanel = createAdvicePanel(advisor || [], 'panel');
+      // Collapse only on an EXPLICIT 'frequent' self-report -- an absent/
+      // unset experience (today's entire existing userbase; the onboarding
+      // gate never fires for a session with prior autosaves) or 'novice'/
+      // 'occasional' all keep this panel open, matching createAdvicePanel's
+      // own default and every other step's advice panel. See advice.js's
+      // createAdvicePanel docstring for why the default itself is `true`.
+      const advicePanel = createAdvicePanel(advisor || [], 'panel', { defaultExpanded: experience !== 'frequent' });
       main.appendChild(advicePanel.element);
       advicePanel.update(view);
       }
@@ -16540,25 +17150,33 @@ function init() {
   const steps = [homeStep, describeStep, studyStep, designStep, panelStep, namingStep, overviewStep, guideStep];
   const router = createRouter(steps);
 
-  // First-visit walkthrough default (zen-planner Phase 1): a genuinely new
-  // session -- totalSaved === 0, meaning loadMostRecentRecoverable found NO
-  // prior autosave for this browser at all, the same signal loadInitialExperiment
-  // already computed above -- lands on the Guide step's walkthrough content
-  // instead of Home, once, before this tab's first paint. Marked seen
-  // immediately so a reload of the SAME session does not repeat the
-  // redirect (the seeded oregano example is not "no prior session" the
-  // second time around) -- see ui/steps/home.js's "Don't show again" control
-  // for the same flag, set explicitly instead of implicitly.
+  // First-visit onboarding gate (zen-planner Phase B2, superseding Phase 1's
+  // Guide-page redirect): a genuinely new session -- totalSaved === 0,
+  // meaning loadMostRecentRecoverable found NO prior autosave for this
+  // browser at all, the same signal loadInitialExperiment already computed
+  // above -- sees a two-screen chooser (ui/steps/onboarding.js) instead of
+  // landing on Home or Guide, once. Gated on core/onboarding.js's own
+  // `completed` flag (NOT ui/steps/home.js's WALKTHROUGH_SEEN_KEY -- that is
+  // a separate, still-active flag home.js's own "Take the walkthrough" card
+  // uses to avoid a repeat auto-start; the two must not be conflated, see
+  // docs/cma-lessons.md lesson 50) so a reload of the SAME session, after
+  // the gate has been completed or skipped, does not repeat it.
   //
   // !isDraft matters here: loadInitialExperiment's draft branch above
   // hardcodes totalSaved: 0 UNCONDITIONALLY (it returns before ever calling
   // loadMostRecentRecoverable) -- without this guard, an experienced user
-  // who just used "Draft a study from this" in another tab would get
-  // redirected away from their freshly-drafted study on this new tab, which
+  // who just used "Draft a study from this" in another tab would get the
+  // onboarding gate over their freshly-drafted study on this new tab, which
   // is the opposite of a first-time visitor.
-  if (totalSaved === 0 && !isDraft && !loadWalkthroughSeen()) {
-    saveWalkthroughSeen();
-    router.navigate('guide');
+  //
+  // showOnboardingGate() renders straight to document.body (same idiom as
+  // ui/walkthrough.js), independent of router/renderShell's own timing --
+  // see that module's header for why an overlay was chosen over a router
+  // step. Called here, before renderShell, purely to keep this call next to
+  // the totalSaved/isDraft signal it depends on; the overlay does not touch
+  // `main` or require the shell to exist yet.
+  if (totalSaved === 0 && !isDraft && !loadOnboarding().completed) {
+    showOnboardingGate({ router });
   }
 
   const root = document.getElementById('app');
@@ -16610,7 +17228,13 @@ function init() {
 
   function renderActiveStep(id) {
     const step = steps.find((s) => s.id === id) || steps[0];
-    step.render(main, store, { showToast, advisor: kb.advisor, router });
+    // Read fresh on every render rather than caching loadOnboarding() once:
+    // the onboarding gate (idea path) can complete AFTER this closure is
+    // built but before the first render, and a later screen may still
+    // change the stored experience level -- see docs/cma-lessons.md
+    // lesson 46 (re-fetch current state inside handlers, not a stale
+    // closure).
+    step.render(main, store, { showToast, advisor: kb.advisor, router, experience: loadOnboarding().experience });
   }
 
   router.onChange(renderActiveStep);
