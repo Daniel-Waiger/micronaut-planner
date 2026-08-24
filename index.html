@@ -385,6 +385,18 @@ button:focus-visible {
   gap: 8px;
 }
 
+.nav-utilities { display: flex; flex-direction: column; gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); }
+.nav-utilities .nav-step { color: #fff; border-color: transparent; }
+.nav-utilities .nav-step[data-step-id="feedback"] { background: #d95f02; }
+.nav-utilities .nav-step[data-step-id="settings"] { background: #c62828; }
+.nav-utilities .nav-step:hover, .nav-utilities .nav-step.active { color: #fff; filter: brightness(1.08); box-shadow: none; }
+.shell-utilities { display: none; }
+
+.nav-theme-toggle { min-height: 42px; border: 2px solid; border-radius: 9px; padding: 8px; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; box-shadow: 0 1px 0 rgb(15 23 42 / 18%); }
+.nav-theme-toggle[data-theme-mode="light"] { color: #0f172a; background: #fff; border-color: #0f172a; }
+.nav-theme-toggle[data-theme-mode="dark"] { color: #f8fafc; background: #0f172a; border-color: #94a3b8; }
+.nav-theme-toggle:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 42%, transparent); outline-offset: 2px; }
+
 .field-commit-row > .field-input,
 .field-commit-row > .duration-control {
   flex: 1 1 auto;
@@ -2077,6 +2089,23 @@ textarea {
   align-items: center;
   min-width: 0;
   gap: 11px;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.shell-brand:hover .shell-title,
+.shell-brand:hover .shell-subtitle {
+  color: var(--accent);
+}
+
+.shell-brand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 12px;
 }
 
 .brand-mark {
@@ -2528,6 +2557,7 @@ td, th { border-color: var(--line); }
 .shell-utilities { position: relative; }
 
 .shell-new-study,
+.shell-feature-walkthrough,
 .shell-utility-toggle,
 .shell-utility-action,
 .mobile-assay-select,
@@ -2635,6 +2665,7 @@ td, th { border-color: var(--line); }
 }
 
 .shell-new-study,
+.shell-feature-walkthrough,
 .shell-utility-toggle {
   display: inline-flex;
   align-items: center;
@@ -2654,6 +2685,21 @@ td, th { border-color: var(--line); }
   border-color: color-mix(in srgb, var(--accent) 62%, var(--line));
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 15%, var(--panel));
+}
+
+.shell-feature-walkthrough {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--line));
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+
+.shell-feature-walkthrough:hover:not(:disabled) {
+  filter: brightness(.95);
+}
+
+.shell-feature-walkthrough:disabled {
+  opacity: .55;
+  cursor: wait;
 }
 
 .shell-utility-toggle:hover,
@@ -3040,6 +3086,7 @@ td, th { border-color: var(--line); }
   .header-actions { gap: 6px; }
   .shell-save-indicator { order: 3; flex-basis: 100%; }
   .shell-new-study,
+  .shell-feature-walkthrough,
   .shell-utility-toggle { flex: 1 1 auto; }
   .shell-mobile-controls { grid-template-columns: 1fr; gap: 3px; }
   .shell-mobile-controls label { margin-top: 4px; }
@@ -3138,6 +3185,7 @@ td, th { border-color: var(--line); }
 .guided-walkthrough-adopt,
 .guided-walkthrough-blank,
 .guided-walkthrough-keep,
+.guided-walkthrough-project-export,
 .workflow-explain {
   display: inline-flex;
   align-items: center;
@@ -3168,6 +3216,7 @@ td, th { border-color: var(--line); }
 .guided-walkthrough-pause:hover,
 .guided-walkthrough-blank:hover,
 .guided-walkthrough-keep:hover,
+.guided-walkthrough-project-export:hover,
 .workflow-explain:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
   color: var(--accent);
@@ -3199,6 +3248,7 @@ td, th { border-color: var(--line); }
 .guided-walkthrough-adopt:focus-visible,
 .guided-walkthrough-blank:focus-visible,
 .guided-walkthrough-keep:focus-visible,
+.guided-walkthrough-project-export:focus-visible,
 .guided-walkthrough-details > summary:focus-visible,
 .workflow-explain:focus-visible,
 .onboarding-choice:focus-visible {
@@ -3520,6 +3570,46 @@ td, th { border-color: var(--line); }
   background: var(--accent-soft);
 }
 
+.feedback-handoff-backdrop {
+  position: fixed;
+  z-index: 60;
+  inset: 0;
+  background: rgb(15 23 42 / 58%);
+  backdrop-filter: blur(3px);
+}
+
+.feedback-handoff-dialog {
+  position: fixed;
+  z-index: 61;
+  top: 50%;
+  left: 50%;
+  width: min(520px, calc(100vw - 40px));
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: clamp(22px, 4vw, 32px);
+  color: var(--ink);
+  background: var(--panel);
+  box-shadow: 0 24px 70px rgb(15 23 42 / 32%);
+}
+
+.feedback-handoff-dialog .step-heading { margin-bottom: 8px; }
+
+.feedback-handoff-description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.feedback-handoff-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
 @media (max-width: 760px) {
   .onboarding-choice-dialog {
     top: 14px;
@@ -3528,6 +3618,13 @@ td, th { border-color: var(--line); }
     max-height: calc(100vh - 28px);
     transform: none;
     padding: 20px;
+  }
+
+  .feedback-handoff-dialog {
+    top: 14px;
+    left: 14px;
+    width: calc(100vw - 28px);
+    transform: none;
   }
 
   .onboarding-choice-list {
@@ -4225,6 +4322,16 @@ td, th { border-color: var(--line); }
   overflow-wrap: anywhere;
 }
 
+/* Supporting descriptions are deliberately inset from the page and section
+   headings. Empty-state messages retain their original alignment, so this
+   creates a quieter text hierarchy without moving controls or status copy. */
+.supporting-description {
+  /* A fixed indent disappeared at high zoom and on broad displays. Scale the
+     supporting-copy gutter with the viewport, while clamping it to a calm
+     minimum/maximum so it never crowds compact layouts or drifts too far. */
+  margin-inline-start: clamp(16px, 2vw, 32px);
+}
+
 .project-details {
   border-top-color: color-mix(in srgb, var(--accent) 42%, var(--line));
 }
@@ -4584,6 +4691,7 @@ td, th { border-color: var(--line); }
    compact rail still has a 76px track, so its 44px toggle preserves the
    original density without reducing the usable main column. */
 .shell-new-study,
+.shell-feature-walkthrough,
 .shell-utility-toggle,
 .shell-utility-action,
 .mobile-assay-select,
@@ -4612,6 +4720,7 @@ td, th { border-color: var(--line); }
   }
 
   .shell-new-study,
+  .shell-feature-walkthrough,
   .shell-utilities,
   .shell-utility-toggle {
     min-width: 0;
@@ -4651,6 +4760,85 @@ td, th { border-color: var(--line); }
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+/* Feature walkthrough: four dimming panes leave the current feature fully
+   visible while the rest of the app is softly blurred. Unlike a full-screen
+   opaque dialog this keeps the explanation spatially attached to its target. */
+.feature-tour-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.feature-tour-shade {
+  position: fixed;
+  pointer-events: auto;
+  background: rgb(15 23 42 / 46%);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.feature-tour-target {
+  position: relative;
+  border-radius: 10px;
+  outline: 3px solid color-mix(in srgb, var(--accent) 72%, #fff);
+  outline-offset: 5px;
+  box-shadow: 0 0 0 8px rgb(255 255 255 / 20%);
+}
+
+.feature-tour-dialog {
+  position: fixed;
+  z-index: 1001;
+  box-sizing: border-box;
+  max-width: calc(100vw - 32px);
+  border: 1px solid color-mix(in srgb, var(--accent) 44%, var(--line));
+  border-top: 3px solid var(--accent);
+  border-radius: 12px;
+  padding: 14px;
+  color: var(--ink);
+  background: var(--panel);
+  box-shadow: 0 18px 48px rgb(15 23 42 / 28%);
+}
+
+.feature-tour-position {
+  margin: 0 0 7px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.feature-tour-title { margin: 0 0 6px; font-size: 17px; line-height: 1.2; }
+.feature-tour-body { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.48; }
+.feature-tour-actions { display: grid; grid-template-columns: auto 1fr auto; gap: 7px; margin-top: 14px; }
+.feature-tour-actions button {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: var(--ink);
+  background: var(--panel-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.feature-tour-next { border-color: var(--accent) !important; color: var(--accent-ink) !important; background: var(--accent) !important; }
+.feature-tour-actions button:hover:not(:disabled) { filter: brightness(.96); }
+.feature-tour-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.feature-tour-actions button:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 42%, transparent); outline-offset: 2px; }
+
+@media (max-width: 600px) {
+  .feature-tour-dialog { padding: 12px; }
+  .feature-tour-actions { grid-template-columns: 1fr 1fr; }
+  .feature-tour-next { grid-column: 1 / -1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feature-tour-shade { backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
 @media print {
@@ -5657,6 +5845,75 @@ function createDefaultStudy() {
       },
     },
   };
+}
+  // ---- src/core/featureWalkthroughVisit.js ----
+// Browser-local eligibility for the feature tour. A session marker is the
+// deliberate refresh guard: sessionStorage survives reloads in one tab but
+// disappears when that tab is closed. localStorage retains only the last
+// time the app was left, never the study or any feedback content.
+
+const FEATURE_TOUR_AWAY_MS = 24 * 60 * 60 * 1000;
+
+const LAST_ACTIVE_KEY = 'micronaut.featureTour.lastActiveAt';
+const SESSION_KEY = 'micronaut.featureTour.activeSession';
+
+function read(storage, key) {
+  try { return storage?.getItem(key); } catch { return null; }
+}
+
+function write(storage, key, value) {
+  try { storage?.setItem(key, String(value)); } catch { /* convenience only */ }
+}
+
+function validTimestamp(value) {
+  const timestamp = Number(value);
+  return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : null;
+}
+
+/**
+ * Returns a small lifecycle controller. It never starts UI itself; main.js
+ * owns overlay priority and calls `shouldStartNow()` only when no other
+ * modal workflow is active.
+ */
+function createFeatureWalkthroughVisit({
+  localStorage: persistentStorage = globalThis.localStorage,
+  sessionStorage: tabStorage = globalThis.sessionStorage,
+  now = () => Date.now(),
+  awayMs = FEATURE_TOUR_AWAY_MS,
+} = {}) {
+  const continuingSession = read(tabStorage, SESSION_KEY) === '1';
+  write(tabStorage, SESSION_KEY, '1');
+  let hiddenAt = null;
+  let initialDecisionPending = true;
+
+  function isAwayLongEnough(timestamp) {
+    const lastActive = validTimestamp(timestamp);
+    return !lastActive || now() - lastActive >= awayMs;
+  }
+
+  function shouldStartNow() {
+    if (!initialDecisionPending) return false;
+    initialDecisionPending = false;
+    return !continuingSession && isAwayLongEnough(read(persistentStorage, LAST_ACTIVE_KEY));
+  }
+
+  function markHidden() {
+    hiddenAt = now();
+    write(persistentStorage, LAST_ACTIVE_KEY, hiddenAt);
+  }
+
+  function shouldStartOnReturn() {
+    if (hiddenAt === null) return false;
+    const wasAwayLongEnough = now() - hiddenAt >= awayMs;
+    hiddenAt = null;
+    return wasAwayLongEnough;
+  }
+
+  function markLeaving() {
+    write(persistentStorage, LAST_ACTIVE_KEY, now());
+  }
+
+  return { shouldStartNow, markHidden, shouldStartOnReturn, markLeaving };
 }
   // ---- src/core/persist.js ----
 
@@ -8295,6 +8552,19 @@ function defaultChannelFilterPair(emissionPeakNm) {
 }
 
 /**
+ * The filter pair a spectrum should show for a channel. A complete saved
+ * pair is an explicit microscope setting and wins; otherwise use the same
+ * emission-derived suggestion displayed in the channel row. Keeping this
+ * decision here prevents the form from showing a suggested filter that the
+ * spectrum silently omits.
+ */
+function effectiveChannelFilterPair(channel, emissionPeakNm) {
+  const saved = normalizePanelFilterPair(channel || {});
+  if (saved.filterCenterNm !== null) return saved;
+  return defaultChannelFilterPair(emissionPeakNm);
+}
+
+/**
  * The color actually shown for a channel: the user's explicit `channel.color`
  * override when set, else `computedDefault` (engine/color.js's
  * `wavelengthToColor` over the channel's resolved emission peak), else `null`
@@ -8374,14 +8644,21 @@ function panelFluorophoreOptions(fluorophores) {
 }
 
 /** Write one picker value into the mode-appropriate field by stable channel id. */
-function panelFluorophoreWriteValue(channels, channelId, value) {
+function panelFluorophoreWriteValue(channels, channelId, value, options = {}) {
   const savedValue = typeof value === 'string' ? value : '';
+  const resetFilter = Boolean(options && options.resetFilter);
   if (!Array.isArray(channels)) return [];
   return channels.map((channel) => {
     if (!channel || channel.id !== channelId) return channel;
-    return channel.conjugation === 'tag-ligand'
-      ? { ...channel, conjugateDye: savedValue }
-      : { ...channel, fluorophore: savedValue };
+    const spectralField = channel.conjugation === 'tag-ligand' ? 'conjugateDye' : 'fluorophore';
+    return {
+      ...channel,
+      [spectralField]: savedValue,
+      // A library pick changes which dye the channel represents, so an old
+      // bandpass suggestion must not masquerade as a setting for the new
+      // dye. The UI then immediately derives the new default from emission.
+      ...(resetFilter ? { filterCenterNm: null, filterBandwidthNm: null } : {}),
+    };
   });
 }
 
@@ -11166,8 +11443,8 @@ function templateFor(stepId, facts) {
         what: 'Review brings the study map, document, and conformance result together in one review surface.',
         why: 'A single readiness result makes outstanding issues visible without silently redefining them.',
         when: 'Use it before exporting, sharing, or treating the plan as ready to run.',
-        how: 'Read the readiness result, then follow each issue back to the step that owns its source field.',
-        tryThis: 'Review the readiness state and decide which listed issue should be resolved first.',
+        how: 'Read the readiness result, then follow each issue back to the step that owns its source field. Use the project-backup button in this focused walkthrough panel when you want a durable copy of the whole study.',
+        tryThis: 'Review the readiness state, decide which listed issue should be resolved first, then download a project backup if you want to keep this version.',
         exampleSummary: `This study is ${text(facts.conformance.readiness, 'not assessed')} with ${plural(facts.conformance.issueCount, 'reported issue')}.`,
       };
     default:
@@ -14526,6 +14803,295 @@ function ollamaCooldownSeconds(limit = DEFAULT_LIMIT, now = Date.now()) {
   const oldest = entries[entries.length - limit];
   return Math.max(0, Math.ceil((oldest + WINDOW_MS - now) / 1000));
 }
+  // ---- src/ui/featureWalkthrough.js ----
+// A concise, feature-level tour that deliberately complements (rather than
+// replaces) the richer step explanation panel. Each stop owns a meaningful
+// workspace area; repeated rows and individual fields remain part of that
+// area's explanation so a real study does not turn into an endless tour.
+
+const stop = (routeId, selector, title, body, revealSelector = null) => Object.freeze({ routeId, selector, title, body, revealSelector });
+
+const FEATURE_TOUR = Object.freeze([
+  stop(null, '.shell-brand', 'Home', 'This mark always returns you to the Study map, the app’s starting point.'),
+  stop(null, '.shell-new-study', 'New study', 'Start a blank plan here. Your earlier browser-local versions remain recoverable.'),
+  stop(null, '.shell-nav', 'Planner navigation', 'Move between the core planning workspaces here. Their order follows the normal study-design flow.'),
+  stop(null, '.nav-utilities', 'Feedback and settings', 'Feedback collects a shareable report when you choose an action. Settings keeps backup and reset tools out of the planning flow.'),
+  stop(null, '.nav-theme-toggle', 'Theme', 'This compact toggle switches the appearance for the next click. It keeps its border visible against either navigation background.'),
+
+  stop('home', '.experiment-compass', 'Study map', 'This is the live picture of what is known and what deserves attention next. Its next-decision action can take you directly to the owning workspace.'),
+  stop('home', '.home-grid', 'Starting paths', 'Use these cards to begin with a blank study or explore an example. The example is read-only until you make a copy.'),
+
+  stop('describe', '.project-description-card', 'Research brief', 'Describe the question, material or system, and purpose in one place. The rest of the planner uses this as shared context.'),
+  stop('describe', '.project-review-button', 'Review the brief', 'This checks your prose against the project context and surfaces structured suggestions. It does not silently rewrite your description.'),
+  stop('describe', '.project-details', 'Confirmed details', 'Use these details to inspect the facts derived from the brief. You can correct them at their owning input when needed.'),
+
+  stop('study', '.field-row', 'Study question', 'Set the study-level question before splitting work into measurements. This keeps shared intent separate from per-measurement details.'),
+  stop('study', '.study-group-token-field', 'Comparison vocabulary', 'Add reusable group or condition labels once here. Measurements can then use the same comparison language consistently.'),
+  stop('study', '.study-assay-row', 'Measurements', 'Each measurement has its own design, acquisition, and data-plan details. Open its workspace from the row when you are ready to specify it.'),
+
+  stop('design', '.question-answer', 'Experimental unit', 'Confirm what counts as one independently assigned or sampled unit. Replicates and conditions build on that definition.'),
+  stop('design', '.factors-list', 'Groups and factors', 'Define the alternatives and crossed variables that form your planned conditions. Add or edit them here without changing the study-wide question.'),
+  stop('design', '.conditions-table', 'Planned conditions', 'This preview expands groups, factors, and replicate counts into the rows you intend to acquire. Correct the source controls above rather than editing generated rows.'),
+
+  stop('panel', '[data-tour-section="acquisition"]', 'Acquisition', 'Confirm the imaging setup and measurement-specific acquisition facts here. These answers feed the downstream data plan.', '[data-tour-section="acquisition"]'),
+  stop('panel', '[data-tour-section="fluorophores"]', 'Fluorophores and spillover', 'Check the fluorophores declared for this measurement and any qualitative spillover flags. This temporary opening closes again as the tour moves on.', '[data-tour-section="fluorophores"]'),
+  stop('panel', '.spectral-view-host', 'Spectral view', 'This compares the known fluorophore curves and detection bands for the current measurement. Curves are schematic, so use it as planning guidance rather than a measured spectrum.', '[data-tour-section="spectral"]'),
+  stop('panel', '[data-tour-section="assembly"] .panel-list', 'Panel assembly', 'Add channels and name their targets, fluorophores, and detection filters here. The structured panel drives more precise controls and the spectral view.', '[data-tour-section="assembly"]'),
+
+  stop('naming', '.naming-grid', 'Naming fields', 'Enter the pieces that make every acquired file traceable to its condition. Previews use clear placeholders for details that are assigned later.'),
+  stop('naming', '.planned-box', 'Filename preview', 'Review the generated filenames before acquisition. The source fields above remain the place to make corrections.'),
+  stop('naming', '.duration-control', 'Schedule estimates', 'Enter only the task times you know. The planner scales them to the planned sample count for the optional downloadable schedule.'),
+
+  stop('overview', '.study-map', 'Study map summary', 'Review the current study structure and readiness in one place. Use linked issues to return to the feature that owns a decision.'),
+  stop('overview', '.overview-export-menu', 'Exports', 'Choose the artifact you need for handoff, planning, or backup. Final-facing exports remain guarded by the planner checks.'),
+  stop('overview', '.overview-secondary-actions', 'Additional handoff tools', 'These actions support sharing, printing, and model-assisted review without changing the study itself.'),
+
+  stop('guide', '.guide-search-row', 'Guide search', 'Search the reference material by the words you need. It filters the guide without altering your study.'),
+  stop('guide', '.guide-section', 'Reference sections', 'These sections explain the planning concepts behind the workspaces. They are optional reference material, not required steps.'),
+
+  stop('feedback', '.describe-textarea', 'Feedback', 'Describe what you tried and where the app stopped helping. This text stays local until you choose a sharing action.'),
+  stop('feedback', '.reveal', 'Technical context', 'Open this to see the context included with a feedback package. Browser details and the study are included only when you export or share.'),
+  stop('feedback', '.overview-secondary-actions', 'Share choices', 'Copy, download, email, or create an issue with the report using these actions. Choose the channel that works for you; none sends automatically.'),
+
+  stop('settings', '.overview-secondary-actions', 'Project backups', 'Download or import a project backup here, or begin a new blank study. Existing browser-local versions remain available through recovery.'),
+]);
+
+function featureTourRouteIds() {
+  return [...new Set(FEATURE_TOUR.map((item) => item.routeId).filter(Boolean))];
+}
+
+function safeStops(stops) {
+  return (Array.isArray(stops) ? stops : [])
+    .filter((item) => item && typeof item.selector === 'string' && item.selector)
+    .map((item) => ({
+      routeId: typeof item.routeId === 'string' && item.routeId ? item.routeId : null,
+      selector: item.selector,
+      title: typeof item.title === 'string' && item.title ? item.title : 'Feature',
+      body: typeof item.body === 'string' && item.body ? item.body : 'This feature supports the current plan.',
+      revealSelector: typeof item.revealSelector === 'string' && item.revealSelector ? item.revealSelector : null,
+    }));
+}
+
+function visibleTarget(doc, selector) {
+  const nodes = [...doc.querySelectorAll(selector)];
+  return nodes.find((node) => {
+    const rect = node.getBoundingClientRect();
+    const style = doc.defaultView?.getComputedStyle?.(node);
+    return rect.width > 0 && rect.height > 0 && style?.display !== 'none' && style?.visibility !== 'hidden';
+  }) || null;
+}
+
+function tourNode(doc, tag, className, text) {
+  const node = doc.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function tourButton(doc, className, text, onClick) {
+  const node = tourNode(doc, 'button', className, text);
+  node.type = 'button';
+  node.addEventListener('click', onClick);
+  return node;
+}
+
+/**
+ * The focus tour owns only temporary DOM. Routes and persistent state remain
+ * in main/router; this controller neither writes a study field nor replaces
+ * existing step-level walkthrough UI.
+ */
+function createFeatureWalkthroughController({ router, stops = FEATURE_TOUR, document: injectedDocument } = {}) {
+  const doc = injectedDocument || globalThis.document;
+  if (!doc?.body) throw new Error('createFeatureWalkthroughController requires a document body.');
+
+  const win = doc.defaultView;
+  const items = safeStops(stops);
+  let index = -1;
+  let active = false;
+  let currentTarget = null;
+  let currentDisclosure = null;
+  let disclosureOpenedByTour = false;
+  let launcher = null;
+  let shell = null;
+  let raf = null;
+
+  const backdrop = tourNode(doc, 'div', 'feature-tour-backdrop');
+  backdrop.setAttribute('aria-hidden', 'true');
+  const shades = ['top', 'right', 'bottom', 'left'].map((side) => tourNode(doc, 'div', `feature-tour-shade feature-tour-shade-${side}`));
+  backdrop.append(...shades);
+  const dialog = tourNode(doc, 'section', 'feature-tour-dialog');
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('aria-live', 'polite');
+  const position = tourNode(doc, 'p', 'feature-tour-position');
+  const title = tourNode(doc, 'h2', 'feature-tour-title');
+  const body = tourNode(doc, 'p', 'feature-tour-body');
+  const actions = tourNode(doc, 'div', 'feature-tour-actions');
+  const back = tourButton(doc, 'feature-tour-back', 'Back', () => show(index - 1));
+  const next = tourButton(doc, 'feature-tour-next', 'Next', () => show(index + 1));
+  const close = tourButton(doc, 'feature-tour-close', 'Close', () => stop());
+  actions.append(back, next, close);
+  dialog.append(position, title, body, actions);
+
+  function removeTarget() {
+    currentTarget?.classList.remove('feature-tour-target');
+    currentTarget = null;
+  }
+
+  function restoreDisclosure() {
+    if (currentDisclosure && disclosureOpenedByTour && currentDisclosure.isConnected) currentDisclosure.open = false;
+    currentDisclosure = null;
+    disclosureOpenedByTour = false;
+  }
+
+  function revealDisclosure(item) {
+    const disclosure = item.revealSelector ? doc.querySelector(item.revealSelector) : null;
+    if (disclosure === currentDisclosure) return;
+    restoreDisclosure();
+    if (!disclosure || String(disclosure.tagName).toLowerCase() !== 'details') return;
+    currentDisclosure = disclosure;
+    if (!disclosure.open) {
+      disclosure.open = true;
+      disclosureOpenedByTour = true;
+    }
+  }
+
+  function schedulePosition() {
+    if (!active || !currentTarget) return;
+    if (raf !== null && win?.cancelAnimationFrame) win.cancelAnimationFrame(raf);
+    const positionNow = () => {
+      raf = null;
+      if (!active || !currentTarget?.isConnected) return;
+      const rect = currentTarget.getBoundingClientRect();
+      const width = win?.innerWidth || doc.documentElement.clientWidth || 1024;
+      const height = win?.innerHeight || doc.documentElement.clientHeight || 768;
+      const pad = 8;
+      const left = Math.max(0, rect.left - pad);
+      const right = Math.min(width, rect.right + pad);
+      const top = Math.max(0, rect.top - pad);
+      const bottom = Math.min(height, rect.bottom + pad);
+      shades[0].style.cssText = `left:0;top:0;width:100%;height:${top}px;`;
+      shades[1].style.cssText = `left:${right}px;top:${top}px;width:${Math.max(0, width - right)}px;height:${Math.max(0, bottom - top)}px;`;
+      shades[2].style.cssText = `left:0;top:${bottom}px;width:100%;height:${Math.max(0, height - bottom)}px;`;
+      shades[3].style.cssText = `left:0;top:${top}px;width:${left}px;height:${Math.max(0, bottom - top)}px;`;
+
+      const gap = 16;
+      const dialogWidth = Math.min(360, Math.max(260, width - 32));
+      const dialogHeight = dialog.offsetHeight || 180;
+      let dialogLeft = right + gap;
+      let dialogTop = Math.max(16, Math.min(rect.top, height - dialogHeight - 16));
+      if (dialogLeft + dialogWidth > width - 16) dialogLeft = left - gap - dialogWidth;
+      if (dialogLeft < 16) {
+        dialogLeft = Math.max(16, Math.min(left, width - dialogWidth - 16));
+        dialogTop = bottom + gap;
+        if (dialogTop + dialogHeight > height - 16) dialogTop = Math.max(16, top - gap - dialogHeight);
+      }
+      dialog.style.width = `${dialogWidth}px`;
+      dialog.style.left = `${dialogLeft}px`;
+      dialog.style.top = `${dialogTop}px`;
+    };
+    if (win?.requestAnimationFrame) raf = win.requestAnimationFrame(positionNow);
+    else positionNow();
+  }
+
+  function render(item) {
+    revealDisclosure(item);
+    const target = visibleTarget(doc, item.selector);
+    if (!target) {
+      restoreDisclosure();
+      return false;
+    }
+    removeTarget();
+    currentTarget = target;
+    currentTarget.classList.add('feature-tour-target');
+    const reducedMotion = Boolean(win?.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+    target.scrollIntoView?.({ block: 'center', behavior: reducedMotion ? 'auto' : 'smooth' });
+    position.textContent = `Feature ${index + 1} of ${items.length}`;
+    title.textContent = item.title;
+    body.textContent = item.body;
+    back.disabled = index <= 0;
+    next.textContent = index >= items.length - 1 ? 'Finish' : 'Next';
+    schedulePosition();
+    next.focus();
+    return true;
+  }
+
+  function afterRoute(callback) {
+    if (win?.requestAnimationFrame) {
+      win.requestAnimationFrame(() => win.requestAnimationFrame(callback));
+      return;
+    }
+    callback();
+  }
+
+  function show(requestedIndex) {
+    if (!active) return;
+    let nextIndex = requestedIndex;
+    const direction = requestedIndex < index ? -1 : 1;
+    while (nextIndex >= 0 && nextIndex < items.length) {
+      const item = items[nextIndex];
+      index = nextIndex;
+      const currentRoute = typeof router?.current === 'function' ? router.current() : null;
+      if (item.routeId && item.routeId !== currentRoute) {
+        router?.navigate?.(item.routeId);
+        afterRoute(() => show(index));
+        return;
+      }
+      if (render(item)) return;
+      nextIndex += direction;
+    }
+    stop();
+  }
+
+  function start(trigger) {
+    if (items.length === 0) return;
+    const ElementConstructor = doc.defaultView?.HTMLElement;
+    launcher = ElementConstructor && trigger instanceof ElementConstructor ? trigger : doc.activeElement;
+    active = true;
+    doc.body.classList.add('feature-tour-active');
+    doc.body.append(backdrop, dialog);
+    show(0);
+  }
+
+  function stop() {
+    if (!active) return;
+    active = false;
+    if (raf !== null && win?.cancelAnimationFrame) win.cancelAnimationFrame(raf);
+    raf = null;
+    removeTarget();
+    restoreDisclosure();
+    backdrop.remove();
+    dialog.remove();
+    doc.body.classList.remove('feature-tour-active');
+    launcher?.focus?.();
+    launcher = null;
+  }
+
+  function onKeydown(event) {
+    if (!active) return;
+    if (event.key === 'Escape') { event.preventDefault(); stop(); }
+    if (event.key === 'ArrowRight') { event.preventDefault(); show(index + 1); }
+    if (event.key === 'ArrowLeft') { event.preventDefault(); show(index - 1); }
+  }
+
+  const unsubscribeRoute = router?.onChange?.(() => { if (active) afterRoute(() => show(index)); });
+  win?.addEventListener('keydown', onKeydown);
+  win?.addEventListener('resize', schedulePosition);
+  win?.addEventListener('scroll', schedulePosition, true);
+
+  return {
+    start,
+    stop,
+    isOpen: () => active,
+    destroy() {
+      stop();
+      if (typeof unsubscribeRoute === 'function') unsubscribeRoute();
+      win?.removeEventListener('keydown', onKeydown);
+      win?.removeEventListener('resize', schedulePosition);
+      win?.removeEventListener('scroll', schedulePosition, true);
+    },
+  };
+}
   // ---- src/ui/clipboard.js ----
 // Shared clipboard-copy helper. Extracted from ui/steps/naming.js (its
 // "Copy full name" button), which had the only implementation of this until
@@ -14561,6 +15127,112 @@ async function copyToClipboard(text) {
   }
   document.body.removeChild(textarea);
   return ok;
+}
+  // ---- src/ui/feedbackHandoff.js ----
+
+const GITHUB_ISSUE_PATH = '/Daniel-Waiger/micronaut-explorer/issues/new';
+
+function githubFeedbackUrl() {
+  return `https://github.com/login?return_to=${encodeURIComponent(GITHUB_ISSUE_PATH)}`;
+}
+
+function emailFeedbackUrl() {
+  return `mailto:?subject=${encodeURIComponent('Micronaut Planner feedback')}`;
+}
+
+const CHANNELS = {
+  copy: {
+    title: 'Feedback package copied',
+    detail: 'Paste it into the message, form, or issue where you want to share feedback. Nothing has been sent automatically.',
+  },
+  download: {
+    title: 'Feedback package downloaded and copied',
+    detail: 'Attach the downloaded micronaut-feedback.txt file, or paste the copied package into the place you are sharing feedback. Nothing has been sent automatically.',
+  },
+  email: {
+    title: 'Feedback package copied',
+    detail: 'Open your email app, start a message to the team, and paste the copied package into the message body. The app does not place your feedback or study in the email link.',
+    proceedLabel: 'Open email app',
+    destination: emailFeedbackUrl,
+  },
+  github: {
+    title: 'Feedback package copied',
+    detail: 'Sign in to GitHub if needed, then paste the copied package into the new issue. The GitHub link contains no feedback, browser details, or study data.',
+    proceedLabel: 'Open GitHub issue',
+    destination: githubFeedbackUrl,
+  },
+};
+
+function removeModal(backdrop, dialog, previouslyFocused, onKeydown) {
+  window.removeEventListener('keydown', onKeydown);
+  backdrop.remove();
+  dialog.remove();
+  if (previouslyFocused && typeof previouslyFocused.focus === 'function') previouslyFocused.focus();
+}
+
+function showFeedbackHandoffModal({ channel, copied, onOpen } = {}) {
+  const config = CHANNELS[channel] || CHANNELS.copy;
+  const previouslyFocused = document.activeElement;
+  const backdrop = document.createElement('div');
+  backdrop.className = 'feedback-handoff-backdrop';
+  const dialog = document.createElement('section');
+  dialog.className = 'feedback-handoff-dialog';
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('aria-labelledby', 'feedback-handoff-title');
+  dialog.setAttribute('aria-describedby', 'feedback-handoff-description');
+  const title = document.createElement('h2');
+  title.id = 'feedback-handoff-title';
+  title.className = 'step-heading';
+  title.textContent = copied ? config.title : 'Could not copy the feedback package';
+  const description = document.createElement('p');
+  description.id = 'feedback-handoff-description';
+  description.className = 'feedback-handoff-description';
+  description.textContent = copied
+    ? config.detail
+    : 'Your browser did not allow the package to be copied. Use Download feedback package instead, then attach or paste that file where you are sharing feedback.';
+  const actions = document.createElement('div');
+  actions.className = 'feedback-handoff-actions';
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'shell-utility-action';
+  close.textContent = copied && config.proceedLabel ? 'Not now' : 'Done';
+  let onKeydown = () => {};
+  const closeModal = () => removeModal(backdrop, dialog, previouslyFocused, onKeydown);
+  close.addEventListener('click', closeModal);
+  actions.appendChild(close);
+  if (copied && config.proceedLabel) {
+    const proceed = document.createElement('button');
+    proceed.type = 'button';
+    proceed.className = 'copy-button';
+    proceed.textContent = config.proceedLabel;
+    proceed.addEventListener('click', () => {
+      const destination = config.destination?.();
+      closeModal();
+      if (destination) (onOpen || ((url) => window.open(url, '_blank', 'noopener')))(destination);
+    });
+    actions.appendChild(proceed);
+  }
+  onKeydown = (event) => {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    closeModal();
+  };
+  backdrop.addEventListener('click', () => {
+    closeModal();
+  });
+  dialog.addEventListener('click', (event) => event.stopPropagation());
+  window.addEventListener('keydown', onKeydown);
+  dialog.append(title, description, actions);
+  document.body.append(backdrop, dialog);
+  close.focus();
+}
+
+async function handoffFeedback({ report, channel = 'copy', download, onOpen } = {}) {
+  if (channel === 'download' && typeof download === 'function') download();
+  const copied = await copyToClipboard(report || '');
+  showFeedbackHandoffModal({ channel, copied, onOpen });
+  return copied;
 }
   // ---- src/ui/icons.js ----
 // Small, Lucide-style SVGs used throughout the planner. Keeping them local
@@ -14635,6 +15307,14 @@ const ICONS = {
     ['circle', 'cx=12,cy=13,r=2.5'],
     ['path', 'm14 15 2 2'],
   ],
+  feedback: [
+    ['path', 'M5 5h14v10H9l-4 4z'],
+    ['path', 'M8 9h8M8 12h5'],
+  ],
+  settings: [
+    ['circle', 'cx=12,cy=12,r=3'],
+    ['path', 'M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.5-2.3 1A7 7 0 0 0 15 6l-.3-2.5h-5L9.4 6a7 7 0 0 0-1.5 1L5.6 6 3.6 9.5l2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.5 2.3-1a7 7 0 0 0 1.5 1l.3 2.5h5l.3-2.5a7 7 0 0 0 1.5-1l2.3 1 2-3.5-2-1.5c.1-.3.1-.7.1-1z'],
+  ],
 };
 
 function parseAttributes(source) {
@@ -14670,8 +15350,6 @@ function createIcon(name, className) {
 
 const THEME_KEY = 'micronaut.theme';
 const NAV_COLLAPSED_KEY = 'micronaut.navCollapsed';
-const FEEDBACK_ISSUES_URL = 'https://github.com/Daniel-Waiger/micronaut-planner/issues/new';
-const GITHUB_ISSUE_BODY_LIMIT = 6000;
 
 function readPreference(key) {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -14712,12 +15390,18 @@ function renderShell(root, store, router, options = {}) {
   let saveState = options.saveState || { status: 'unsaved' };
   let recoveryEntries = Array.isArray(options.recoveryEntries) ? options.recoveryEntries : [];
   let workflowProgress = options.workflowProgress || { primary: [], assays: [], summary: {} };
+  let themeNavButton = null;
+  let featureWalkthroughHandler = null;
   root.textContent = '';
 
   const header = document.createElement('header');
   header.className = 'shell-header';
-  const brand = document.createElement('div');
+  const brand = document.createElement('button');
+  brand.type = 'button';
   brand.className = 'shell-brand';
+  brand.title = 'Go to Home';
+  brand.setAttribute('aria-label', 'Go to Home');
+  brand.addEventListener('click', () => router.navigate('home'));
   brand.appendChild(createIcon('microscope', 'brand-mark'));
   const brandCopy = document.createElement('div');
   const title = document.createElement('div');
@@ -14754,6 +15438,16 @@ function renderShell(root, store, router, options = {}) {
     });
     headerActions.appendChild(newStudy);
   }
+
+  const featureWalkthrough = document.createElement('button');
+  featureWalkthrough.type = 'button';
+  featureWalkthrough.className = 'shell-feature-walkthrough';
+  featureWalkthrough.append(createIcon('walkthrough', 'button-icon'), document.createTextNode('Walkthrough'));
+  featureWalkthrough.title = 'Take a focused tour of the app’s feature areas.';
+  featureWalkthrough.setAttribute('aria-label', 'Start feature walkthrough');
+  featureWalkthrough.disabled = true;
+  featureWalkthrough.addEventListener('click', () => featureWalkthroughHandler?.(featureWalkthrough));
+  headerActions.appendChild(featureWalkthrough);
 
   const utilities = document.createElement('div');
   utilities.className = 'shell-utilities';
@@ -14843,16 +15537,13 @@ function renderShell(root, store, router, options = {}) {
   }
   renderRecoveryEntries();
   if (onResetOnboarding) utilityMenu.appendChild(action('Show onboarding again', onResetOnboarding));
-  utilityMenu.appendChild(action('Copy feedback report', async () => {
+  utilityMenu.appendChild(action('Copy feedback report', () => {
     const report = buildFeedbackReport({ currentStepId: router.current(), kbIssueCount, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined, experiment: store.get() });
-    showToast((await copyToClipboard(report)) ? 'Copied a feedback report.' : 'Could not copy automatically.');
+    handoffFeedback({ report, channel: 'copy' });
   }));
   utilityMenu.appendChild(action('Open GitHub issue', () => {
     const report = buildFeedbackReport({ currentStepId: router.current(), kbIssueCount, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined, experiment: store.get() });
-    const body = report.length > GITHUB_ISSUE_BODY_LIMIT
-      ? `${report.slice(0, GITHUB_ISSUE_BODY_LIMIT)}\n\n...(truncated — use Copy feedback report for the full study JSON)`
-      : report;
-    window.open(`${FEEDBACK_ISSUES_URL}?title=${encodeURIComponent('Feedback: ')}&body=${encodeURIComponent(body)}`, '_blank', 'noopener');
+    handoffFeedback({ report, channel: 'github' });
   }));
   // A persisted theme is an explicit preference. With System selected, do
   // not set a data-theme attribute so the stylesheet's media query can track
@@ -14875,6 +15566,20 @@ function renderShell(root, store, router, options = {}) {
       button.setAttribute('aria-checked', String(selected));
       button.classList.toggle('is-selected', selected);
     });
+    if (themeNavButton) {
+      // This is an action, not a readout: it names the appearance a click
+      // will apply. System follows the current OS appearance until a user
+      // makes that first explicit light/dark choice.
+      const effectiveTheme = theme === 'system'
+        ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        : theme;
+      const nextTheme = effectiveTheme === 'dark' ? 'light' : 'dark';
+      const label = `${nextTheme[0].toUpperCase()}${nextTheme.slice(1)}`;
+      themeNavButton.textContent = `Theme · ${label}`;
+      themeNavButton.dataset.themeMode = nextTheme;
+      themeNavButton.setAttribute('aria-label', `Switch to ${label} theme.`);
+      themeNavButton.title = `Switch to ${label} theme.`;
+    }
   }
   ['dark', 'light', 'system'].forEach((mode) => {
     const label = mode === 'system' ? 'System' : `${mode[0].toUpperCase()}${mode.slice(1)} mode`;
@@ -15135,7 +15840,20 @@ function renderShell(root, store, router, options = {}) {
   renderNavToggle();
   const navSteps = document.createElement('div');
   navSteps.className = 'nav-steps';
-  sticky.append(navToggle, navSteps);
+  const navUtilities = document.createElement('div');
+  navUtilities.className = 'nav-utilities';
+  themeNavButton = document.createElement('button');
+  themeNavButton.type = 'button';
+  themeNavButton.className = 'nav-theme-toggle';
+  themeNavButton.addEventListener('click', () => {
+    const effectiveTheme = theme === 'system'
+      ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      : theme;
+    theme = effectiveTheme === 'dark' ? 'light' : 'dark';
+    applyTheme();
+  });
+  applyTheme();
+  sticky.append(navToggle, navSteps, navUtilities);
   nav.appendChild(sticky);
   const main = document.createElement('main');
   main.className = 'shell-main';
@@ -15182,6 +15900,7 @@ function renderShell(root, store, router, options = {}) {
   }
   function renderNav(activeId) {
     navSteps.textContent = '';
+    navUtilities.textContent = '';
     router.steps.forEach((step) => {
       const current = workflowStep(step.id);
       const button = document.createElement('button');
@@ -15204,8 +15923,9 @@ function renderShell(root, store, router, options = {}) {
         button.appendChild(badge);
       }
       button.addEventListener('click', () => router.navigate(step.id));
-      navSteps.appendChild(button);
+      (step.utility ? navUtilities : navSteps).appendChild(button);
     });
+    navUtilities.appendChild(themeNavButton);
   }
   function renderMobileControls(activeId = router.current()) {
     const experiment = store.get();
@@ -15229,24 +15949,38 @@ function renderShell(root, store, router, options = {}) {
     const index = steps.findIndex((step) => step.routeId === activeId);
     const currentStep = workflowStep(activeId);
     const mapDecision = workflowProgress.map?.nextDecision;
-    const mapDestination = nextDecisionDestination(mapDecision, store.get());
+    const currentExperiment = store.get();
+    const mapDestination = nextDecisionDestination(mapDecision, currentExperiment);
+    // A map decision owned by the visible step is useful guidance, but it is
+    // not a navigation destination. Treating it as one made Continue route
+    // back to the same hash (notably Samples & design) and appear inert.
+    // Switching to another measurement on this same route remains a real
+    // destination and must keep the map-aware behavior.
+    const isCurrentDestination = (destination, experiment) =>
+      destination &&
+      destination.routeId === activeId &&
+      (!destination.measurementId || destination.measurementId === experiment.activeAssayId);
+    const continueDestination = isCurrentDestination(mapDestination, currentExperiment) ? null : mapDestination;
     position.textContent = index === -1 ? 'Guide (optional)' : `Step ${index + 1} of ${steps.length}`;
     back.disabled = index <= 0;
-    next.disabled = mapDestination === null && (index === -1 || index >= steps.length - 1);
-    next.textContent = mapDestination ? 'Continue to next decision' : 'Continue';
+    next.disabled = continueDestination === null && (index === -1 || index >= steps.length - 1);
+    next.textContent = continueDestination ? 'Continue to next decision' : 'Continue';
     explain.disabled = !currentStep || typeof explainStepHandler !== 'function';
     back.onclick = () => { if (index > 0) router.navigate(steps[index - 1].routeId); };
     next.onclick = () => {
-      if (mapDestination) {
+      if (continueDestination) {
         const current = store.get();
         const freshDestination = nextDecisionDestination(mapDecision, current);
-        if (!freshDestination) return;
-        if (freshDestination.measurementId && current.activeAssayId !== freshDestination.measurementId) {
-          store.patch({ activeAssayId: freshDestination.measurementId });
+        if (freshDestination && !isCurrentDestination(freshDestination, current)) {
+          if (freshDestination.measurementId && current.activeAssayId !== freshDestination.measurementId) {
+            store.patch({ activeAssayId: freshDestination.measurementId });
+          }
+          router.navigate(freshDestination.routeId);
+          return;
         }
-        router.navigate(freshDestination.routeId);
-        return;
       }
+      // The map either already points here or changed while the user was
+      // deciding. In both cases Continue retains its dependable linear path.
       if (index !== -1 && index < steps.length - 1) router.navigate(steps[index + 1].routeId);
     };
     // currentStep.id is the canonical workflow id: workflowStep() applies
@@ -15283,6 +16017,10 @@ function renderShell(root, store, router, options = {}) {
     setExplainStepHandler(handler) {
       explainStepHandler = typeof handler === 'function' ? handler : null;
       renderFooter(router.current());
+    },
+    setFeatureWalkthroughHandler(handler) {
+      featureWalkthroughHandler = typeof handler === 'function' ? handler : null;
+      featureWalkthrough.disabled = !featureWalkthroughHandler;
     },
     setGuidedAsideVisible(visible) {
       const isVisible = Boolean(visible);
@@ -16739,7 +17477,7 @@ function createDescribeStep(kb) {
       narrativeCard.appendChild(scope);
 
       const intro = document.createElement('p');
-      intro.className = 'proposals-empty';
+      intro.className = 'proposals-empty supporting-description';
       intro.textContent = 'Describe the whole study -- its question, system or material, and purpose -- before planning individual measurement details.';
       narrativeCard.appendChild(intro);
 
@@ -17323,12 +18061,12 @@ function createNamingStep(kb) {
     const activeAssay = assayById(store.get(), assayId);
     const activeAssayLabel = activeAssay?.label || 'this measurement';
     const scope = document.createElement('p');
-    scope.className = 'proposals-empty';
+    scope.className = 'proposals-empty supporting-description';
     scope.textContent = `Planning files and work for: ${activeAssayLabel}.`;
     main.appendChild(scope);
 
     const filenameGuidance = document.createElement('p');
-    filenameGuidance.className = 'proposals-empty';
+    filenameGuidance.className = 'proposals-empty supporting-description';
     filenameGuidance.textContent =
       'Enter the details needed for a final filename here. Date, sample ID, and instrument label may be assigned later on acquisition day; until then previews use clearly labelled placeholders. Final exports remain guarded by planner checks.';
     main.appendChild(filenameGuidance);
@@ -17442,7 +18180,7 @@ function createNamingStep(kb) {
     main.appendChild(scheduleHeading);
 
     const scheduleHint = document.createElement('p');
-    scheduleHint.className = 'proposals-empty';
+    scheduleHint.className = 'proposals-empty supporting-description';
     scheduleHint.textContent =
       'Roughly how long each bench/microscope task takes for you -- used to build a downloadable schedule, scaled to the planned sample count above. Enter hours and minutes; leave blank to skip.';
     main.appendChild(scheduleHint);
@@ -17699,7 +18437,7 @@ const designStep = {
     const activeMeasurementLabel = activeAssay?.label ||
       (activeAssayIndex === -1 ? 'Active measurement' : `Measurement ${activeAssayIndex + 1}`);
     const scope = document.createElement('p');
-    scope.className = 'proposals-empty';
+    scope.className = 'proposals-empty supporting-description';
     scope.textContent = `Planning samples and design for: ${activeMeasurementLabel}.`;
     main.appendChild(scope);
 
@@ -17727,7 +18465,7 @@ const designStep = {
     main.appendChild(unitRow);
 
     const hierarchyHelp = document.createElement('p');
-    hierarchyHelp.className = 'proposals-empty';
+    hierarchyHelp.className = 'proposals-empty supporting-description';
     hierarchyHelp.textContent =
       'An experimental unit is what is independently assigned or sampled for the whole study. A biological (independent) replicate is another such unit; a technical replicate is a repeated measurement of the same unit. Groups are mutually exclusive alternatives, while factors can cross groups or one another to form combinations.';
     main.appendChild(hierarchyHelp);
@@ -17820,7 +18558,7 @@ const designStep = {
     main.appendChild(groupsHeading);
 
     const groupsHint = document.createElement('p');
-    groupsHint.className = 'proposals-empty';
+    groupsHint.className = 'proposals-empty supporting-description';
     groupsHint.textContent =
       'Your experimental groups, such as a control group and one or more treatment groups. Every sample belongs to exactly ONE group.';
     main.appendChild(groupsHint);
@@ -18178,6 +18916,44 @@ const designStep = {
     });
 
     renderAll();
+  },
+};
+  // ---- src/ui/steps/feedback.js ----
+
+function feedbackButton(label, onClick) {
+  const node = document.createElement('button');
+  node.type = 'button'; node.className = 'copy-button'; node.textContent = label; node.addEventListener('click', onClick);
+  return node;
+}
+
+const githubLoginUrl = githubFeedbackUrl;
+
+const feedbackStep = {
+  id: 'feedback', title: 'Feedback', utility: true,
+  render(main, store, options = {}) {
+    main.textContent = '';
+    const title = document.createElement('h1'); title.className = 'step-heading'; title.textContent = 'Feedback';
+    const intro = document.createElement('p'); intro.className = 'proposals-empty supporting-description'; intro.textContent = 'Tell us what happened. Nothing leaves this browser unless you choose one of the sharing actions below.';
+    const form = document.createElement('textarea'); form.className = 'describe-textarea'; form.placeholder = 'What were you trying to do, and where did you get stuck?'; form.rows = 7;
+    const context = document.createElement('details'); context.className = 'reveal';
+    const summary = document.createElement('summary'); summary.className = 'reveal-summary'; summary.textContent = 'Included technical context';
+    const body = document.createElement('p'); body.className = 'proposals-empty supporting-description'; body.textContent = `Current page: ${options.router?.current?.() || 'unknown'}. A feedback package also includes browser details and your study only when you choose an export action.`;
+    context.append(summary, body);
+    const actions = document.createElement('div'); actions.className = 'overview-secondary-actions';
+    const report = () => `${form.value.trim() ? `${form.value.trim()}\n\n` : ''}${buildFeedbackReport({ currentStepId: options.router?.current?.(), kbIssueCount: options.kbIssueCount, userAgent: navigator.userAgent, experiment: store.get() })}`;
+    actions.append(
+      feedbackButton('Copy feedback package', () => handoffFeedback({ report: report(), channel: 'copy' })),
+      feedbackButton('Download feedback package', () => {
+        const packageText = report();
+        return handoffFeedback({
+          report: packageText, channel: 'download',
+          download: () => downloadTextFile(packageText, 'micronaut-feedback.txt', 'text/plain;charset=utf-8'),
+        });
+      }),
+      feedbackButton('Email feedback', () => handoffFeedback({ report: report(), channel: 'email' })),
+      feedbackButton('Open GitHub issue', () => handoffFeedback({ report: report(), channel: 'github' }))
+    );
+    main.append(title, intro, form, context, actions);
   },
 };
   // ---- src/ui/steps/guide.js ----
@@ -19067,7 +19843,7 @@ function appendExampleMapSummary(main, store) {
   heading.className = 'design-subheading';
   heading.textContent = 'Example study map';
   const copy = document.createElement('p');
-  copy.className = 'proposals-empty';
+  copy.className = 'proposals-empty supporting-description';
   copy.textContent = 'Read-only while you explore. Make a copy to edit this study.';
   const facts = document.createElement('ul');
   facts.className = 'overview-controls-list';
@@ -19152,7 +19928,7 @@ const homeStep = {
     heading.textContent = 'Study map';
     main.appendChild(heading);
     const subheading = document.createElement('p');
-    subheading.className = 'proposals-empty';
+    subheading.className = 'proposals-empty supporting-description';
     subheading.textContent = 'Start with the shape of your study, then move directly to the workspace that owns each decision.';
     main.appendChild(subheading);
 
@@ -19849,7 +20625,7 @@ function createOverviewStep(kb) {
       main.appendChild(heading);
 
       const explainer = document.createElement('p');
-      explainer.className = 'proposals-empty';
+      explainer.className = 'proposals-empty supporting-description';
       explainer.textContent =
         'A deterministic review of this study, built entirely from what you’ve entered on the other steps -- nothing here is LLM-generated.';
       main.appendChild(explainer);
@@ -20616,7 +21392,7 @@ function renderSpectralView(container, entries, overlapRules, interactionState) 
     spectralViewElement(
       'p',
       'spectral-view-caption',
-      'Normalized Gaussian curves are schematic from each fluorophore’s emission peak and drafted width -- not measured spectra or quantitative bleed-through. Filter bands are user-entered.'
+      'Normalized Gaussian curves are schematic from each fluorophore’s emission peak and drafted width -- not measured spectra or quantitative bleed-through. Filter bands use an emission-derived suggestion until you enter the microscope’s actual detection filter.'
     )
   );
 
@@ -20816,10 +21592,11 @@ function summaryText(channels) {
 // Native disclosures keep the dense microscopy workflow scan-friendly while
 // preserving its complete, keyboard-operable content. All state lives in the
 // existing store/render paths below; these elements only group that content.
-function createMicroscopySection(title, initiallyOpen = false) {
+function createMicroscopySection(title, initiallyOpen = false, tourSection = '') {
   const details = document.createElement('details');
   details.className = 'microscopy-section';
   details.open = initiallyOpen;
+  if (tourSection) details.dataset.tourSection = tourSection;
   const summary = document.createElement('summary');
   summary.className = 'microscopy-section-summary';
   summary.textContent = title;
@@ -20874,14 +21651,14 @@ function createPanelStep(kb) {
         main.appendChild(heading);
 
         const scope = document.createElement('p');
-        scope.className = 'proposals-empty';
+        scope.className = 'proposals-empty supporting-description';
         scope.textContent = `Planning how data will be acquired for: ${activeMeasurementLabel(store.get(), assayId)}.`;
         main.appendChild(scope);
 
-        const acquisitionSection = createMicroscopySection('Acquisition', true);
-        const fluorophoresSection = createMicroscopySection('Fluorophores and spillover');
-        const spectralSection = createMicroscopySection('Spectral view');
-        const assemblySection = createMicroscopySection('Panel assembly');
+        const acquisitionSection = createMicroscopySection('Acquisition', true, 'acquisition');
+        const fluorophoresSection = createMicroscopySection('Fluorophores and spillover', false, 'fluorophores');
+        const spectralSection = createMicroscopySection('Spectral view', false, 'spectral');
+        const assemblySection = createMicroscopySection('Panel assembly', false, 'assembly');
         const guidanceSection = createMicroscopySection('Guidance');
         main.appendChild(acquisitionSection);
         main.appendChild(fluorophoresSection);
@@ -20908,7 +21685,7 @@ function createPanelStep(kb) {
         });
 
       const explainer = document.createElement('p');
-      explainer.className = 'proposals-empty';
+      explainer.className = 'proposals-empty supporting-description';
       explainer.textContent =
         'A qualitative check for spectral spillover across this measurement’s fluorophores -- excitation/emission peak proximity only, not a spectral-overlap integral.';
       fluorophoresSection.appendChild(explainer);
@@ -21031,6 +21808,10 @@ function createPanelStep(kb) {
         const resolved = token
           ? resolveMarkerToken(token, kb.index, kb.markersKb, kb.spectra)
           : { token: 'Unnamed channel', canonical: null, state: 'unrecognized' };
+        const effectiveFilter = effectiveChannelFilterPair(
+          channel,
+          resolved.state === 'known' ? resolved.emissionPeakNm : null
+        );
         // Same effective-color computation as the channel row's own swatch
         // (appendColorControls) -- the spectral view and the row it came
         // from can never show a channel in two different colors.
@@ -21038,8 +21819,8 @@ function createPanelStep(kb) {
         return {
           ...resolved,
           channelId: channel.id,
-          filterCenterNm: channel.filterCenterNm,
-          filterBandwidthNm: channel.filterBandwidthNm,
+          filterCenterNm: effectiveFilter ? effectiveFilter.filterCenterNm : null,
+          filterBandwidthNm: effectiveFilter ? effectiveFilter.filterBandwidthNm : null,
           color: effectiveChannelColor(channel, computedColor),
         };
       }
@@ -21238,7 +22019,9 @@ function createPanelStep(kb) {
             // re-render to pick up the new selection -- writeChannelsData
             // alone left them showing whatever the row resolved to before
             // this pick (often nothing, for a brand-new channel).
-            const next = panelFluorophoreWriteValue(currentChannels(), channel.id, value);
+            const next = panelFluorophoreWriteValue(currentChannels(), channel.id, value, {
+              resetFilter: isStructural,
+            });
             if (isStructural) writeChannelsStructure(next);
             else writeChannelsData(next);
           },
@@ -21423,6 +22206,22 @@ function createPanelStep(kb) {
     },
   };
 }
+  // ---- src/ui/steps/settings.js ----
+function settingsButton(label, onClick, className = 'copy-button') { const node = document.createElement('button'); node.type = 'button'; node.className = className; node.textContent = label; node.addEventListener('click', onClick); return node; }
+const settingsStep = {
+  id: 'settings', title: 'Settings', utility: true,
+  render(main, store, options = {}) {
+    main.textContent = '';
+    const title = document.createElement('h1'); title.className = 'step-heading'; title.textContent = 'Settings';
+    const intro = document.createElement('p'); intro.className = 'proposals-empty supporting-description'; intro.textContent = 'Project backups, recovery, and display preferences are kept here.';
+    const actions = document.createElement('div'); actions.className = 'overview-secondary-actions';
+    actions.append(settingsButton('Download project backup', () => options.onExportProject?.()));
+    const file = document.createElement('input'); file.type = 'file'; file.accept = '.json,application/json'; file.hidden = true; file.addEventListener('change', () => { const selected = file.files?.[0]; file.value = ''; if (selected) Promise.resolve(options.onImportProject?.(selected)); });
+    actions.append(settingsButton('Import project backup', () => file.click()), file);
+    actions.append(settingsButton('Start a blank study', () => { if (window.confirm('Start a blank study? Your current work remains available in Restore.')) options.onNewBlank?.(); }));
+    main.append(title, intro, actions);
+  },
+};
   // ---- src/ui/steps/study.js ----
 // The Measurements step: the one study-level surface, sitting above every assay.
 // First in main.js's steps array -- the landing page, and the
@@ -21586,7 +22385,7 @@ const studyStep = {
     main.appendChild(vocabHeading);
 
     const vocabHelp = document.createElement('p');
-    vocabHelp.className = 'proposals-empty';
+    vocabHelp.className = 'proposals-empty supporting-description';
     vocabHelp.textContent =
       'Reuse these labels when measurements compare groups or conditions. Observational studies may have no comparison labels.';
     main.appendChild(vocabHelp);
@@ -21840,7 +22639,7 @@ const studyStep = {
     }
 
     const addAssayHint = document.createElement('p');
-    addAssayHint.className = 'proposals-empty';
+    addAssayHint.className = 'proposals-empty supporting-description';
     const assayCount = Array.isArray(store.get().assays) ? store.get().assays.length : 0;
     addAssayHint.textContent =
       assayCount >= MAX_STUDY_ROWS
@@ -21943,6 +22742,8 @@ function completeStep(step, fallbackId) {
  *
  * `subscribe(listener)` is optional and is normally `store.subscribe`; it
  * refreshes values such as an active assay without changing guide progress.
+ * `onExportProject()` is the app-owned project-backup export action. It is
+ * surfaced only while the walkthrough focuses the Review step.
  * `onVisibilityChange(visible)` is an optional shell presentation hook; it
  * fires only when this controller actually opens or closes the aside.
  */
@@ -21959,6 +22760,7 @@ function createWalkthroughController({
   onAdoptExample,
   onNewBlank,
   onKeepExploringExample,
+  onExportProject,
   onVisibilityChange,
 } = {}) {
   if (!host || !host.ownerDocument) {
@@ -22136,7 +22938,7 @@ function createWalkthroughController({
 
     const top = element(doc, 'div', 'guided-walkthrough-topline');
     top.appendChild(element(doc, 'p', 'guided-walkthrough-position', mode === 'explanation'
-      ? `Explain this step · ${context.title}`
+      ? `About this step · ${context.title}`
       : `Example walkthrough · Step ${Math.max(index + 1, 1)} of ${workflow.length}`));
     top.appendChild(button(doc, 'guided-walkthrough-close', 'Close', close));
 
@@ -22153,6 +22955,17 @@ function createWalkthroughController({
     const tryThis = element(doc, 'section', 'guided-walkthrough-try');
     tryThis.append(element(doc, 'h3', '', 'Try this'), element(doc, 'p', '', context.tryThis));
     const actions = element(doc, 'div', 'guided-walkthrough-actions');
+
+    // Keep the full study-format export menu in the Review workspace. This
+    // focused walkthrough action is the durable whole-project backup that
+    // was otherwise available only through the header utility menu.
+    if (stepId === 'overview' && typeof onExportProject === 'function') {
+      const exportProject = button(doc, 'guided-walkthrough-project-export', 'Download project backup', () => {
+        onExportProject();
+      });
+      exportProject.title = 'Download a backup of this whole project';
+      actions.appendChild(exportProject);
+    }
 
     if (mode === 'walkthrough') {
       const previous = index > 0 ? workflow[index - 1] : null;
@@ -22369,7 +23182,7 @@ function init() {
   // Guide LAST: stays permanently in the nav so it is always reachable, even
   // though Home's own "Take the walkthrough" card is now the more prominent
   // entry point to the same content. See ui/steps/guide.js's header.
-  const steps = [homeStep, describeStep, studyStep, designStep, panelStep, namingStep, overviewStep, guideStep];
+  const steps = [homeStep, describeStep, studyStep, designStep, panelStep, namingStep, overviewStep, guideStep, feedbackStep, settingsStep];
   const router = createRouter(steps);
 
   const root = document.getElementById('app');
@@ -22492,6 +23305,7 @@ function init() {
 
   let exampleChooser = null;
   let guidedController = null;
+  let featureWalkthroughController = null;
   let exploreExample = false;
 
   function showExampleChooser({ explicit = false } = {}) {
@@ -22564,9 +23378,25 @@ function init() {
     onAdoptExample: adoptExampleTemplate,
     onNewBlank: startBlankStudy,
     onKeepExploringExample: () => {},
+    onExportProject: exportProjectBackup,
     onVisibilityChange: shell.setGuidedAsideVisible,
   });
   shell.setExplainStepHandler((stepId) => guidedController.explain(stepId));
+  featureWalkthroughController = createFeatureWalkthroughController({ router });
+  shell.setFeatureWalkthroughHandler((trigger) => featureWalkthroughController.start(trigger));
+  const featureTourVisit = createFeatureWalkthroughVisit();
+
+  function startReturningFeatureTour() {
+    if (exampleChooser || guidedProgressState.status === 'active' || featureWalkthroughController.isOpen()) return false;
+    featureWalkthroughController.start();
+    return true;
+  }
+
+  window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') featureTourVisit.markHidden();
+    if (document.visibilityState === 'visible' && featureTourVisit.shouldStartOnReturn()) startReturningFeatureTour();
+  });
+  window.addEventListener('pagehide', () => featureTourVisit.markLeaving());
 
   function explainGuided(stepId) {
     const routeStepId = guidedStepIdForRoute(router.current());
@@ -22622,6 +23452,9 @@ function init() {
       onResumeGuided: () => guidedController.resume(),
       onRestartGuided: () => guidedController.restart(),
       onExplainGuided: explainGuided,
+      kbIssueCount: kb.issues.length,
+      onExportProject: exportProjectBackup,
+      onImportProject: importProjectBackup,
     });
   }
 
@@ -22692,6 +23525,7 @@ function init() {
 
   const chooserShown = showExampleChooser();
   if (!chooserShown && guidedProgressState.status === 'active') guidedController.resume();
+  else if (!chooserShown && featureTourVisit.shouldStartNow()) startReturningFeatureTour();
 }
 
 init();
