@@ -293,6 +293,21 @@ button:focus-visible {
   display: none;
 }
 
+.shell-body.shell-nav-collapsed .nav-theme-toggle {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  padding: 8px;
+}
+
+.shell-body.shell-nav-collapsed .nav-theme-label {
+  display: none;
+}
+
+.shell-body.shell-nav-collapsed .nav-theme-icon {
+  display: block;
+}
+
 .nav-step:hover {
   background: var(--panel-2);
   color: var(--ink);
@@ -392,9 +407,12 @@ button:focus-visible {
 .nav-utilities .nav-step:hover, .nav-utilities .nav-step.active { color: #fff; filter: brightness(1.08); box-shadow: none; }
 .shell-utilities { display: none; }
 
-.nav-theme-toggle { min-height: 42px; border: 2px solid; border-radius: 9px; padding: 8px; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; box-shadow: 0 1px 0 rgb(15 23 42 / 18%); }
+.nav-theme-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; border: 2px solid; border-radius: 9px; padding: 8px; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; box-shadow: 0 1px 0 rgb(15 23 42 / 18%); }
 .nav-theme-toggle[data-theme-mode="light"] { color: #0f172a; background: #fff; border-color: #0f172a; }
 .nav-theme-toggle[data-theme-mode="dark"] { color: #f8fafc; background: #0f172a; border-color: #94a3b8; }
+.nav-theme-icon { display: none; flex: 0 0 auto; width: 24px; height: 24px; }
+.nav-theme-toggle[data-bulb-state="on"] .nav-theme-icon { color: #f59e0b; filter: drop-shadow(0 0 3px rgb(245 158 11 / 62%)); }
+.nav-theme-toggle[data-bulb-state="off"] .nav-theme-icon { color: currentColor; opacity: .72; }
 .nav-theme-toggle:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 42%, transparent); outline-offset: 2px; }
 
 .field-commit-row > .field-input,
@@ -15302,6 +15320,11 @@ const ICONS = {
     ['path', 'M9 18h6M10 22h4'],
     ['path', 'M8 14a6 6 0 1 1 8 0c-.9.8-1.4 1.7-1.5 3h-5c-.1-1.3-.6-2.2-1.5-3'],
   ],
+  'lightbulb-on': [
+    ['path', 'M9 18h6M10 22h4'],
+    ['path', 'M8 14a6 6 0 1 1 8 0c-.9.8-1.4 1.7-1.5 3h-5c-.1-1.3-.6-2.2-1.5-3'],
+    ['path', 'M12 1v2M4.2 4.2l1.4 1.4M19.8 4.2l-1.4 1.4M2 12h2M20 12h2'],
+  ],
   folder: [
     ['path', 'M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'],
     ['circle', 'cx=12,cy=13,r=2.5'],
@@ -15575,10 +15598,16 @@ function renderShell(root, store, router, options = {}) {
         : theme;
       const nextTheme = effectiveTheme === 'dark' ? 'light' : 'dark';
       const label = `${nextTheme[0].toUpperCase()}${nextTheme.slice(1)}`;
-      themeNavButton.textContent = `Theme · ${label}`;
+      const bulbState = nextTheme === 'light' ? 'on' : 'off';
+      const bulb = createIcon(bulbState === 'on' ? 'lightbulb-on' : 'lightbulb', 'nav-theme-icon');
+      const copy = document.createElement('span');
+      copy.className = 'nav-theme-label';
+      copy.textContent = `Theme · ${label}`;
+      themeNavButton.replaceChildren(bulb, copy);
       themeNavButton.dataset.themeMode = nextTheme;
+      themeNavButton.dataset.bulbState = bulbState;
       themeNavButton.setAttribute('aria-label', `Switch to ${label} theme.`);
-      themeNavButton.title = `Switch to ${label} theme.`;
+      themeNavButton.title = `Light bulb ${bulbState}. Switch to ${label} theme.`;
     }
   }
   ['dark', 'light', 'system'].forEach((mode) => {
