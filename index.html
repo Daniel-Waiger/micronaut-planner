@@ -9,8 +9,8 @@
    Palette follows the custom-property + light/dark pattern proven in
    tools/cma-dashboard/index.html: a default :root palette, an
    @media (prefers-color-scheme) override, and explicit
-   :root[data-theme="dark"|"light"] overrides so the in-app toggle always
-   wins over the OS preference in both directions. */
+   :root[data-theme="dark"|"light"] overrides so an explicit in-app mode
+   wins over the OS preference, while System keeps following the OS. */
 
 /* Modern SaaS system: neutral slate structure with indigo for focused work.
    The variables remain semantic so existing, dependency-free components can
@@ -2675,6 +2675,23 @@ td, th { border-color: var(--line); }
   background: var(--surface-muted);
 }
 
+.shell-theme-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.shell-theme-action.is-selected {
+  color: var(--accent);
+  font-weight: 750;
+}
+
+.shell-theme-action.is-selected::after {
+  content: '✓';
+  color: var(--accent);
+  font-weight: 800;
+}
+
 .shell-utility-heading {
   padding: 8px 10px 3px;
   color: var(--muted);
@@ -4028,6 +4045,585 @@ td, th { border-color: var(--line); }
   }
 }
 
+/* -------------------------------------------------------------------------
+   Orientation-first integration. These selectors deliberately consume the
+   settled Study-map, compass, and workspace markup only; interaction and
+   data ownership remain in their existing UI modules.
+   ------------------------------------------------------------------------- */
+
+/* The compass stays an orientation aid rather than a second dashboard: title,
+   current scope, and the one consequential action lead; factual detail and
+   status badges occupy a quiet second row on wide screens. */
+.experiment-compass {
+  display: grid;
+  grid-template-columns: minmax(180px, .9fr) minmax(280px, 1.45fr) minmax(190px, 1fr) minmax(220px, 1.15fr);
+  gap: 8px 16px;
+  align-items: center;
+  padding: 12px clamp(18px, 2.4vw, 28px);
+  background: var(--panel);
+}
+
+.experiment-compass-title,
+.experiment-compass-scope,
+.experiment-compass-detail,
+.experiment-compass-next,
+.shell-mobile-compass-title,
+.shell-mobile-compass-scope {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.experiment-compass-title {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 780;
+  letter-spacing: -.012em;
+}
+
+.experiment-compass-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+  min-width: 0;
+}
+
+.experiment-compass-detail,
+.experiment-compass-example {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--muted);
+  background: var(--surface-muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.experiment-compass-example {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--line));
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.experiment-compass-scope {
+  display: block;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.35;
+}
+
+.experiment-compass-next {
+  min-width: 0;
+}
+
+.experiment-compass-next:not(:has(.experiment-compass-next-action)) {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.experiment-compass-next-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 44%, var(--line));
+  border-radius: 9px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 740;
+  line-height: 1.3;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.experiment-compass-next-action:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, var(--panel));
+}
+
+.experiment-compass-next-action:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 36%, transparent);
+  outline-offset: 2px;
+}
+
+.experiment-compass .workflow-badges {
+  grid-column: 1 / -1;
+  padding-top: 2px;
+}
+
+/* Scope copy has the same restrained, high-contrast treatment across the
+   renamed workspaces without turning explanatory paragraphs into alerts. */
+.project-description-help,
+.shell-main > .step-heading + .proposals-empty {
+  max-width: 900px;
+  margin-top: -10px;
+  margin-bottom: 18px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-left: 3px solid var(--accent);
+  border-radius: 9px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent-soft) 62%, var(--panel));
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.project-description-card > .proposals-empty {
+  overflow-wrap: anywhere;
+}
+
+.project-details {
+  border-top-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+}
+
+/* Study-map intake and summary use the existing card language, while the
+   responsive grid makes the hierarchy legible at a glance without requiring
+   a diagram or horizontal scroller. */
+.study-map-editor {
+  display: grid;
+  gap: 18px;
+  width: min(100%, 1120px);
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.study-map-intake,
+.study-map-summary,
+.study-map-measurement,
+.study-map-add-measurement,
+.study-map-next-decision {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: var(--shadow-card);
+}
+
+.study-map-intake,
+.study-map-add-measurement,
+.study-map-next-decision {
+  padding: clamp(16px, 2.5vw, 24px);
+}
+
+.study-map-progress {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .065em;
+  text-transform: uppercase;
+}
+
+.study-map-intake > .design-subheading,
+.study-map-editor > .design-subheading {
+  margin: 0 0 14px;
+  font-size: clamp(19px, 2.3vw, 25px);
+  line-height: 1.28;
+  text-transform: none;
+}
+
+.study-map-field {
+  min-width: 0;
+  margin-top: 14px;
+}
+
+.study-map-field .proposals-empty,
+.study-map-comparison > .proposals-empty {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.study-map-field .field-input {
+  width: 100%;
+}
+
+.study-map-field textarea.field-input {
+  min-height: 132px;
+}
+
+.study-map-comparison {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 16px 0 0;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+.study-map-comparison legend {
+  max-width: 100%;
+  padding: 0 4px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 720;
+  line-height: 1.35;
+}
+
+.study-map-comparison .question-answer {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--panel);
+  line-height: 1.35;
+}
+
+.study-map-comparison .question-answer:has(input:checked) {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+  background: var(--accent-soft);
+}
+
+.study-map-comparison input[type='radio'] {
+  width: 18px;
+  height: 18px;
+  margin: 0 8px 0 0;
+  accent-color: var(--accent);
+}
+
+.study-map-status {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.study-map-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.study-map-actions :is(.workflow-back, .workflow-continue, .question-answer),
+.study-map-next-decision .workflow-continue {
+  min-height: 44px;
+}
+
+.study-map-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+  padding: clamp(16px, 2.5vw, 24px);
+}
+
+.study-map-summary .study-map-comparison {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.study-map-measurements {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.study-map-measurement {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 16px;
+}
+
+.study-map-measurement h4,
+.study-map-add-measurement h4,
+.study-map-next-decision h3 {
+  margin: 0 0 7px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 760;
+  line-height: 1.3;
+}
+
+.study-map-add-measurement {
+  display: grid;
+  grid-template-columns: minmax(180px, .75fr) minmax(240px, 1.25fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.study-map-add-measurement h4,
+.study-map-add-measurement .study-map-status {
+  grid-column: 1 / -1;
+}
+
+.study-map-add-measurement .add-factor-button {
+  min-height: 44px;
+  margin: 0;
+}
+
+.study-map-next-decision {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 72%, var(--panel)), var(--panel));
+}
+
+.study-map-next-decision p {
+  margin: 0 0 14px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* A measurement row remains compact at desktop widths, then becomes a clear
+   vertical card as available inline space narrows. */
+.study-assay-row {
+  align-items: flex-start;
+  padding: 14px;
+}
+
+.study-assay-details {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.study-assay-details p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.study-assay-readout { color: var(--ink); font-weight: 650; }
+.study-assay-system,
+.study-assay-progress { margin-top: 4px !important; color: var(--muted); font-size: 12.5px; }
+.study-assay-progress { color: var(--accent); font-weight: 700; }
+
+.study-assay-basename {
+  align-self: center;
+  max-width: 100%;
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-muted);
+  overflow-wrap: anywhere;
+}
+
+.study-assay-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.study-assay-actions :is(.question-answer, .remove-factor-button) {
+  min-height: 44px;
+}
+
+.assay-pill-label,
+.assay-pill-delete,
+.assay-pill-add,
+.nav-step {
+  min-height: 44px;
+}
+
+.assay-pill-label { padding-block: 8px; }
+.assay-pill-delete { min-width: 36px; padding-block: 8px; }
+
+/* Values deliberately generated for a preview are visible as a bounded
+   placeholder state rather than as facts about the study. */
+.planned-box .planned-empty {
+  display: grid;
+  gap: 7px;
+  margin: 10px 0 0;
+  padding: 11px 12px;
+  border: 1px dashed color-mix(in srgb, var(--warn) 45%, var(--line));
+  border-radius: 9px;
+  color: var(--muted);
+  background: var(--warn-soft);
+  line-height: 1.45;
+}
+
+.planned-box .planned-empty > :first-child { margin-top: 0; }
+.planned-box .planned-empty > :last-child { margin-bottom: 0; }
+.planned-box .planned-empty mark {
+  padding: 1px 4px;
+  border-radius: 4px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--warn) 30%, var(--panel));
+  font-family: var(--mono);
+  font-size: .94em;
+  font-weight: 700;
+}
+
+/* The Review already supplies textual tier names. These headings provide a
+   repeated visual rhythm without conflating consequence tier with severity. */
+.conformance > h3.overview-node-title {
+  margin: 20px 0 9px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  background: var(--surface-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.conformance > h3.overview-node-title:nth-of-type(2) { border-left-color: var(--ok); }
+.conformance > h3.overview-node-title:nth-of-type(3) { border-left-color: var(--warn); }
+.conformance > h3.overview-node-title:nth-of-type(4) { border-left-color: var(--muted); }
+
+.conformance > h3.overview-node-title + .issues-list { margin-bottom: 16px; }
+.conformance .issue { overflow-wrap: anywhere; }
+.conformance .conformance-issue-link { width: 100%; padding: 0; border: 0; color: inherit; background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.conformance .conformance-issue-link:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 36%, transparent); outline-offset: 3px; }
+
+@media (max-width: 1200px) {
+  .experiment-compass {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(220px, 1.1fr);
+  }
+
+  .experiment-compass-details,
+  .experiment-compass .workflow-badges { display: none; }
+}
+
+@media (max-width: 760px) {
+  /* Override the older mobile rule only for the settled compass: its details
+     collapse, but the study title, scope, and valid next action remain. */
+  .workflow-strip.experiment-compass {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 10px;
+    min-height: 0;
+    padding: 10px 14px;
+  }
+
+  .experiment-compass-title { font-size: 13px; }
+  .experiment-compass-scope { grid-column: 1 / -1; font-size: 11.5px; }
+  .experiment-compass-next { grid-column: 1 / -1; }
+  .experiment-compass-next-action { min-height: 44px; }
+  .shell-mobile-compass { display: none; }
+
+  .study-map-editor { gap: 14px; }
+  .study-map-intake,
+  .study-map-summary,
+  .study-map-add-measurement,
+  .study-map-next-decision { padding: 16px; }
+  .study-map-summary,
+  .study-map-add-measurement { grid-template-columns: minmax(0, 1fr); }
+  .study-map-add-measurement h4,
+  .study-map-add-measurement .study-map-status { grid-column: auto; }
+  .study-map-measurements { grid-template-columns: 1fr; }
+  .study-map-actions { justify-content: stretch; }
+  .study-map-actions :is(.workflow-back, .workflow-continue, .question-answer),
+  .study-map-next-decision .workflow-continue { flex: 1 1 130px; }
+
+  .study-assay-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .study-assay-row .field-input { width: 100%; max-width: none; }
+  .study-assay-basename { align-self: start; }
+  .study-assay-actions { width: 100%; margin-left: 0; justify-content: stretch; }
+  .study-assay-actions :is(.question-answer, .remove-factor-button) { flex: 1 1 170px; }
+}
+
+@media (max-width: 430px) {
+  .workflow-strip.experiment-compass { padding-inline: 12px; }
+  .study-map-actions { display: grid; grid-template-columns: 1fr; }
+  .study-map-actions :is(.workflow-back, .workflow-continue, .question-answer),
+  .study-map-next-decision .workflow-continue,
+  .study-assay-actions :is(.question-answer, .remove-factor-button) { width: 100%; }
+  .study-map-comparison { padding: 12px; }
+}
+
+/* Shell controls remain comfortably touchable at every breakpoint. The
+   compact rail still has a 76px track, so its 44px toggle preserves the
+   original density without reducing the usable main column. */
+.shell-new-study,
+.shell-utility-toggle,
+.shell-utility-action,
+.mobile-assay-select,
+.mobile-step-select,
+.workflow-back,
+.workflow-continue,
+.workflow-explain {
+  min-height: 44px;
+}
+
+.nav-toggle {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+}
+
+@media (max-width: 430px) {
+  /* Flex shrink previously clipped the Utilities label at 320px. A bounded
+     two-column grid gives both header actions a real minimum track, while
+     the save state deliberately occupies its own row. */
+  .header-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 6px;
+  }
+
+  .shell-new-study,
+  .shell-utilities,
+  .shell-utility-toggle {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .shell-utility-toggle {
+    justify-content: center;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .shell-save-indicator {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .shell-utility-menu {
+    right: 0;
+    left: auto;
+  }
+}
+
+@media (max-width: 340px) {
+  .header-actions { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .experiment-compass *,
+  .experiment-compass *::before,
+  .experiment-compass *::after,
+  .study-map-editor *,
+  .study-map-editor *::before,
+  .study-map-editor *::after {
+    scroll-behavior: auto;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media print {
+  .experiment-compass,
+  .study-map-intake .study-map-actions,
+  .study-map-add-measurement,
+  .study-map-next-decision { display: none !important; }
+
+  .study-map-editor,
+  .study-map-summary,
+  .study-map-measurements,
+  .study-map-measurement { display: block; width: 100%; box-shadow: none; }
+  .study-map-measurement + .study-map-measurement { margin-top: 10px; }
+}
+
 </style>
 </head>
 <body>
@@ -4495,7 +5091,8 @@ function listPaths(obj, path) {
 // Experiment data model: shape, defaults, and version migration.
 //
 // v3 introduced the ASSAY TIER; v4 completes the user-facing terminology
-// migration from the legacy treatment-axis wording to "groups" in the study vocabulary.
+// migration from the legacy treatment-axis wording to "groups" in the study vocabulary;
+// v5 adds the study-level orientation context.
 // A study (still called Experiment, for
 // continuity with everything already written against that name) holds one
 // or more assays, each an almost-complete v2 slice
@@ -4509,7 +5106,7 @@ function listPaths(obj, path) {
 // stay written against the flat v2 shape forever.
 
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 // `origin` is intentionally descriptive rather than a permission or
 // provenance mechanism. It answers the UI's ownership question ("is this
@@ -4518,6 +5115,22 @@ const SCHEMA_VERSION = 4;
 // are normalized to `user`, the conservative choice: old work must never be
 // presented as an example just because it resembles one.
 const STUDY_ORIGINS = new Set(['blank', 'example', 'imported', 'draft', 'template', 'user']);
+
+// These values describe the study's comparison structure. They deliberately
+// do not duplicate group labels (groupVocabulary) or any assay-level design
+// fields: `observational` makes an empty group vocabulary intentional rather
+// than an omitted comparison decision.
+const STUDY_COMPARISON_MODES = new Set(['not-decided', 'groups', 'observational']);
+
+const EMPTY_STUDY_CONTEXT = Object.freeze({
+  system: '',
+  experimentalUnit: '',
+  comparisonMode: 'not-decided',
+});
+
+function emptyStudyContext() {
+  return { ...EMPTY_STUDY_CONTEXT };
+}
 
 // Two-stage name.
 //
@@ -4559,6 +5172,10 @@ function emptyExperiment() {
     // What the whole study is trying to answer. Study-level: every assay
     // exists in service of one question, unlike the per-assay design.
     researchQuestion: '',
+    // Orientation facts about the whole study. These stay separate from the
+    // research question, per-assay specimen, and comparison labels so their
+    // ownership remains explicit.
+    studyContext: emptyStudyContext(),
     narrative: {
       text: '',
       history: [],
@@ -4755,11 +5372,54 @@ function migrateV3toV4(obj) {
   };
 }
 
+/**
+ * v4 -> v5: add the explicit study-orientation context. This migration is
+ * intentionally additive: legacy saves did not distinguish an unanswered
+ * question from an answer embedded in prose, so it must never infer context
+ * from narrative text, groups, assay specimen, or example strings.
+ */
+function migrateV4toV5(obj) {
+  const src = obj && typeof obj === 'object' ? obj : {};
+  return {
+    ...src,
+    schemaVersion: 5,
+    studyContext: emptyStudyContext(),
+  };
+}
+
 const MIGRATIONS = {
   1: migrateV1toV2,
   2: migrateV2toV3,
   3: migrateV3toV4,
+  4: migrateV4toV5,
 };
+
+// v5 saves can have been written by an interrupted or older client. Normalize
+// the new additive object at the same boundary that normalizes meta.origin,
+// preserving any unrelated current-version data (including future additive
+// studyContext keys) instead of replacing the whole saved object.
+function normalizeStudyContext(current) {
+  const supplied =
+    current && current.studyContext && typeof current.studyContext === 'object' && !Array.isArray(current.studyContext)
+      ? current.studyContext
+      : null;
+  const normalized = {
+    ...(supplied || {}),
+    system: supplied && typeof supplied.system === 'string' ? supplied.system : '',
+    experimentalUnit: supplied && typeof supplied.experimentalUnit === 'string' ? supplied.experimentalUnit : '',
+    comparisonMode:
+      supplied && STUDY_COMPARISON_MODES.has(supplied.comparisonMode)
+        ? supplied.comparisonMode
+        : EMPTY_STUDY_CONTEXT.comparisonMode,
+  };
+
+  const isValid =
+    supplied &&
+    supplied.system === normalized.system &&
+    supplied.experimentalUnit === normalized.experimentalUnit &&
+    supplied.comparisonMode === normalized.comparisonMode;
+  return isValid ? current : { ...current, studyContext: normalized };
+}
 
 function migrate(obj) {
   let current = obj;
@@ -4785,11 +5445,12 @@ function migrate(obj) {
     version = current.schemaVersion;
   }
 
-  // Saved studies from before the additive meta.origin field are still
-  // otherwise valid data, so version migration alone cannot normalize them. Do it
-  // at the boundary every persisted experiment crosses instead. This returns
-  // the original object when it already carries a supported origin, retaining
-  // the existing no-op identity contract for current saves.
+  // Saved studies from before the additive meta.origin and studyContext fields
+  // are otherwise valid data, so version migration alone cannot normalize
+  // them. Do it at the boundary every persisted experiment crosses instead.
+  // Each normalizer preserves the original object when its own data is valid,
+  // retaining the no-op identity contract for already-valid current saves.
+  current = normalizeStudyContext(current);
   const meta = current && current.meta && typeof current.meta === 'object' ? current.meta : {};
   if (STUDY_ORIGINS.has(meta.origin)) return current;
   return { ...current, meta: { ...meta, origin: 'user' } };
@@ -4827,6 +5488,17 @@ const RESEARCH_QUESTION =
 // CTL (bare/uncoated) vs OPP (oregano plasma polymer coated) -- the paper's own
 // two mutually exclusive groups, using the paper's exact labels.
 const GROUP_VOCABULARY = { levels: ['CTL', 'OPP'] };
+
+// These are explicit facts from the shipped paper-backed example, not values
+// inferred from its research question or its four measurement records. The
+// coating is the shared system under study and the CTL/OPP comparison is
+// assigned to independently prepared coverslips; individual measurements
+// remain free to carry their own specimen and method details.
+const STUDY_CONTEXT = {
+  system: 'Oregano-derived plasma polymer coatings on glass coverslips for in vitro wound-healing evaluation',
+  experimentalUnit: 'One independently prepared glass coverslip assigned to CTL or OPP coating',
+  comparisonMode: 'groups',
+};
 
 // One entry per assay. `fields` uses the same bare v2-shaped paths
 // assayView/scopeWrite already operate on -- applied directly to the assay
@@ -4926,6 +5598,7 @@ function createDefaultStudy() {
     ...study,
     meta: { ...study.meta, origin: 'example' },
     researchQuestion: RESEARCH_QUESTION,
+    studyContext: { ...STUDY_CONTEXT },
     groupVocabulary: { levels: [...GROUP_VOCABULARY.levels] },
     assays,
     activeAssayId: assays[0].id,
@@ -4934,6 +5607,9 @@ function createDefaultStudy() {
       slots: {
         ...study.provenance.slots,
         researchQuestion: { tag: 'kb-default', detail: null },
+        'studyContext.system': { tag: 'kb-default', detail: null },
+        'studyContext.experimentalUnit': { tag: 'kb-default', detail: null },
+        'studyContext.comparisonMode': { tag: 'kb-default', detail: null },
         groupVocabulary: { tag: 'kb-default', detail: null },
         ...provenanceSlots,
       },
@@ -7996,7 +8672,7 @@ function studyNameIssues(experiment, config, baseTemplate) {
     // switcher, ui/steps/study.js's list): a raw shortId would be
     // technically correct but unreadable in an issue message meant for a
     // person, not a debugger.
-    const label = (assay && assay.label) || `Assay ${index + 1}`;
+    const label = (assay && assay.label) || `Measurement ${index + 1}`;
     if (!byBaseName.has(base)) byBaseName.set(base, []);
     byBaseName.get(base).push(label);
   });
@@ -8005,7 +8681,7 @@ function studyNameIssues(experiment, config, baseTemplate) {
     if (labels.length > 1) {
       issues.push({
         field: 'exptype',
-        message: `Assays ${labels.join(', ')} all produce the identical base name '${base}' -- give them different experiment types, or every file in one will overwrite the other.`,
+        message: `Measurements ${labels.join(', ')} all produce the identical base name '${base}' -- give them different experiment types, or every file in one will overwrite the other.`,
         severity: 'error',
       });
     }
@@ -9504,6 +10180,562 @@ function checkConformance(experiment, kb, config, baseTemplate) {
     crossAssayIssues,
   };
 }
+  // ---- src/engine/decisionTriage.js ----
+// Consequence-based decision grouping for Review. This is deliberately a
+// consumer of experimentMap and conformance rather than another readiness
+// engine: its tiers answer when a decision matters, while conformance remains
+// the sole owner of issue severity and export permission.
+
+const DECISION_TIERS = Object.freeze([
+  'study-shape',
+  'measurement-design',
+  'before-acquisition',
+  'later',
+]);
+
+const TIER_SET = new Set(DECISION_TIERS);
+
+// Canonical conformance identities, never display text, determine tiers. The
+// field sets deliberately include all fields emitted by the current producers
+// plus the stable identities the map will expose for study context.
+const STUDY_SHAPE_FIELDS = new Set([
+  'researchQuestion',
+  'research-question',
+  'system',
+  'studyContext.system',
+  'comparisonMode',
+  'comparison-mode',
+  'groupVocabulary',
+  'groupVocabulary.levels',
+  'assays',
+  'readout',
+  'readoutText',
+  'experimentalUnit',
+  'studyContext.experimentalUnit',
+]);
+const MEASUREMENT_DESIGN_FIELDS = new Set([
+  'groups',
+  'factors',
+  'biologicalReplicates',
+  'technicalReplicates',
+  'idScheme',
+  'controls',
+]);
+const BEFORE_ACQUISITION_FIELDS = new Set([
+  'modality',
+  'magnification',
+  'markers',
+  'panel',
+  'target_path',
+  'exptype',
+]);
+const LATER_FIELDS = new Set(['date', 'sample', 'instrument', 'instrumentLabel', 'timing', 'notes']);
+
+function hasText(value) {
+  return typeof value === 'string' && value.length > 0;
+}
+
+function asObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function tierForField(field, fallback = 'later') {
+  if (STUDY_SHAPE_FIELDS.has(field)) return 'study-shape';
+  if (MEASUREMENT_DESIGN_FIELDS.has(field)) return 'measurement-design';
+  if (BEFORE_ACQUISITION_FIELDS.has(field)) return 'before-acquisition';
+  if (LATER_FIELDS.has(field)) return 'later';
+  return fallback;
+}
+
+function tierForMapDecision(decision) {
+  if (TIER_SET.has(decision.tier)) return decision.tier;
+  return tierForField(decision.id, tierForField(decision.field));
+}
+
+function routeForIssue(issue, tier) {
+  // Keep a producer-supplied route intact. Existing conformance records have
+  // no route, so the canonical section provides a stable default for Review.
+  if (hasText(issue.routeId)) return issue.routeId;
+  if (hasText(issue.route)) return issue.route;
+  if (issue.section === 'design' || issue.section === 'controls') return 'design';
+  if (issue.section === 'panel') return 'panel';
+  if (issue.section === 'naming' || issue.section === 'incomplete' || issue.section === 'path') return 'naming';
+  if (issue.section === 'cross-assay') return issue.field === 'exptype' ? 'naming' : 'study';
+  return tier === 'study-shape' ? 'home' : null;
+}
+
+function assayIdForIssue(issue, fallback) {
+  const safeIssue = asObject(issue);
+  return Object.prototype.hasOwnProperty.call(safeIssue, 'assayId') ? safeIssue.assayId : fallback;
+}
+
+/**
+ * Assign a display tier to one existing conformance issue without changing
+ * the issue's severity, field, section, or producer-supplied destination.
+ */
+function classifyConformanceIssue(rawIssue) {
+  const issue = asObject(rawIssue);
+  let tier;
+
+  // Section is part of the producer's canonical identity. Design and panel
+  // issues stay in their owning consequence class even if a future field name
+  // overlaps another section's vocabulary.
+  if (issue.section === 'design' || issue.section === 'controls') {
+    tier = 'measurement-design';
+  } else if (issue.section === 'panel' || issue.section === 'path') {
+    tier = 'before-acquisition';
+  } else {
+    tier = tierForField(issue.field);
+  }
+
+  const routeId = routeForIssue(issue, tier);
+  return {
+    ...issue,
+    tier,
+    routeId,
+  };
+}
+
+function conformanceItems(conformance) {
+  const report = asObject(conformance);
+  const items = [];
+  const assays = Array.isArray(report.assays) ? report.assays : [];
+
+  for (const assay of assays) {
+    const assayReport = asObject(assay);
+    const issues = Array.isArray(assayReport.issues) ? assayReport.issues : [];
+    for (const issue of issues) {
+      // Spreading copies the issue, retaining its exact severity and section;
+      // it never annotates the conformance object in place.
+      items.push({
+        ...classifyConformanceIssue(issue),
+        source: 'conformance',
+        assayId: assayIdForIssue(issue, assayReport.id),
+      });
+    }
+  }
+
+  const crossAssayIssues = Array.isArray(report.crossAssayIssues) ? report.crossAssayIssues : [];
+  for (const issue of crossAssayIssues) {
+    items.push({
+      ...classifyConformanceIssue(issue),
+      source: 'conformance',
+      assayId: assayIdForIssue(issue, null),
+    });
+  }
+  return items;
+}
+
+function mapItems(experimentMap) {
+  const map = asObject(experimentMap);
+  const decisions = Array.isArray(map.decisions) ? map.decisions : [];
+  return decisions
+    // experimentMap retains conformance decisions so it can choose the
+    // authoritative nextDecision. Review instead consumes raw conformance:
+    // it carries severity, section, and the report's real assay identity.
+    .filter((decision) => decision && typeof decision === 'object' && decision.source !== 'conformance')
+    .map((decision) => ({
+      ...decision,
+      tier: tierForMapDecision(decision),
+      source: 'map',
+    }));
+}
+
+/**
+ * Combine the map's ordinary decisions with conformance exceptions in a
+ * fixed, deterministic display order. Input order is preserved within each
+ * tier: map order first, followed by per-assay conformance order and then
+ * cross-assay order. No input is mutated.
+ */
+function decisionTriage(experimentMap, conformance) {
+  const buckets = new Map(DECISION_TIERS.map((tier) => [tier, []]));
+  for (const item of [...mapItems(experimentMap), ...conformanceItems(conformance)]) {
+    // Malformed map records cannot create a fifth UI group; the only safe
+    // fallback is the least urgent fixed tier.
+    const tier = TIER_SET.has(item.tier) ? item.tier : 'later';
+    buckets.get(tier).push(item);
+  }
+
+  const groups = DECISION_TIERS.map((tier) => {
+    const items = buckets.get(tier);
+    return { tier, count: items.length, items };
+  });
+  const counts = Object.fromEntries(groups.map((group) => [group.tier, group.count]));
+  counts.total = groups.reduce((total, group) => total + group.count, 0);
+
+  return { groups, counts };
+}
+
+// A descriptive alias keeps call sites readable without creating a second
+// classifier or an alternative result contract.
+const triageDecisions = decisionTriage;
+  // ---- src/engine/experimentMap.js ----
+// Pure study-orientation projection. This is the one authority for the
+// Study-map's next-decision ordering; UI consumers receive its values and
+// never infer orientation from prose or array positions themselves.
+
+
+const MAP_STATES = Object.freeze([
+  'missing',
+  'provisional',
+  'answered',
+  'needs-attention',
+]);
+
+const EXPERIMENT_MAP_DECISION_TIERS = Object.freeze([
+  'study-shape',
+  'measurement-design',
+  'before-acquisition',
+  'later',
+]);
+// Preserve the module's public vocabulary while keeping the flattened build's
+// shared function scope free of decisionTriage's top-level declaration.
+
+const PROVISIONAL_TAGS = new Set(['llm', 'llm_freetext']);
+const TIER_ORDER = new Map(EXPERIMENT_MAP_DECISION_TIERS.map((tier, index) => [tier, index]));
+
+function object(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function experimentMapText(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function experimentMapHasValue(value) {
+  if (Array.isArray(value)) return value.some(experimentMapHasValue);
+  return value !== null && value !== undefined && (typeof value !== 'string' || experimentMapText(value) !== '');
+}
+
+function levels(value) {
+  return Array.isArray(value) ? value.map(experimentMapText).filter(Boolean) : [];
+}
+
+function slotFor(slots, paths) {
+  for (const path of paths) {
+    const slot = object(slots[path]);
+    if (Object.keys(slot).length > 0) return slot;
+  }
+  return {};
+}
+
+function experimentMapIsSkipped(skipped, ids) {
+  return Array.isArray(skipped) && ids.some((id) => skipped.includes(id));
+}
+
+function stateFor(value, slots, paths, skipped, skippedIds) {
+  const slot = slotFor(slots, paths);
+  if (experimentMapHasValue(value)) {
+    return slot.needsReview || PROVISIONAL_TAGS.has(slot.tag) ? 'provisional' : 'answered';
+  }
+  return experimentMapIsSkipped(skipped, skippedIds) ? 'provisional' : 'missing';
+}
+
+function validAssays(experiment) {
+  const seen = new Set();
+  const source = Array.isArray(experiment.assays) ? experiment.assays : [];
+  return source.filter((assay) => {
+    const id = assay && typeof assay.id === 'string' ? assay.id.trim() : '';
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+function measurementLabel(assay, index) {
+  return experimentMapText(assay.label) || `Measurement ${index + 1}`;
+}
+
+function specimenSummary(assay) {
+  const specimen = object(assay.specimen);
+  return [...new Set([experimentMapText(specimen.organism), experimentMapText(specimen.sampleType)].filter(Boolean))].join(' · ');
+}
+
+function recognizedReadout(assay) {
+  // `readout` is the canonical id stored by the curated readout picker. A
+  // nonblank `readoutText` is intentionally also valid: a user may describe
+  // an Other measurement without the app pretending it knows its vocabulary.
+  return /^[a-z0-9][a-z0-9-]*$/.test(experimentMapText(assay.readout)) || Boolean(experimentMapText(assay.readoutText));
+}
+
+function measurementState(assay, slots, skipped, index) {
+  const id = assay.id;
+  const labelState = stateFor(
+    experimentMapText(assay.label),
+    slots,
+    [`assay:${id}.label`],
+    skipped,
+    [`measurement-definition:${id}`, `assay:${id}.label`]
+  );
+  const readoutValue = experimentMapText(assay.readoutText) || experimentMapText(assay.readout);
+  const readoutState = stateFor(
+    readoutValue,
+    slots,
+    [`assay:${id}.readout`, `assay:${id}.readoutText`],
+    skipped,
+    [`measurement-definition:${id}`, `assay:${id}.readout`, `assay:${id}.readoutText`]
+  );
+  const defined = Boolean(experimentMapText(assay.label)) && recognizedReadout(assay);
+  if (defined && labelState === 'answered' && readoutState === 'answered') return 'answered';
+  if (labelState === 'provisional' || readoutState === 'provisional') return 'provisional';
+  return 'missing';
+}
+
+function orderedMeasurements(experiment, assays) {
+  const activeId = typeof experiment.activeAssayId === 'string' ? experiment.activeAssayId : '';
+  const activeIndex = assays.findIndex((assay) => assay.id === activeId);
+  if (activeIndex <= 0) return assays;
+  return [assays[activeIndex], ...assays.slice(0, activeIndex), ...assays.slice(activeIndex + 1)];
+}
+
+function decision(id, tier, label, reason, routeId, state, measurementId) {
+  const result = { id, tier, label, reason, routeId, state };
+  if (measurementId) result.measurementId = measurementId;
+  return result;
+}
+
+function conformanceDecision(id, tier, label, reason, routeId, measurementId) {
+  return { ...decision(id, tier, label, reason, routeId, 'needs-attention', measurementId), source: 'conformance' };
+}
+
+function conformanceDecisions(input, knownIds) {
+  const report = object(input);
+  const entries = [];
+  const assayReports = Array.isArray(report.assays) ? report.assays : [];
+  assayReports.forEach((assayReport, assayIndex) => {
+    const reportObject = object(assayReport);
+    const measurementId = typeof reportObject.id === 'string' ? reportObject.id : null;
+    // A report can outlive a deletion. It has no current measurement owner,
+    // so it must not turn into a generic route that could edit the active
+    // measurement; discard it until a fresh conformance projection replaces
+    // the stale record.
+    if (!measurementId || !knownIds.has(measurementId)) return;
+    const issues = Array.isArray(reportObject.issues) ? reportObject.issues : [];
+    issues.forEach((issue, issueIndex) => {
+      const item = object(issue);
+      const classified = classifyConformanceIssue(item);
+      const tier = classified.tier;
+      const message = experimentMapText(item.message) || 'Review this planner check.';
+      entries.push({
+        order: entries.length,
+        tier,
+        value: conformanceDecision(
+          `conformance:${measurementId || 'study'}:${assayIndex}:${issueIndex}`,
+          tier,
+          measurementId ? 'Review measurement planner check' : 'Review planner check',
+          message,
+          classified.routeId,
+          measurementId
+        ),
+      });
+    });
+  });
+
+  const crossAssayIssues = Array.isArray(report.crossAssayIssues) ? report.crossAssayIssues : [];
+  crossAssayIssues.forEach((issue, index) => {
+    const item = object(issue);
+    const classified = classifyConformanceIssue(item);
+    const tier = classified.tier;
+    entries.push({
+      order: entries.length,
+      tier,
+      value: conformanceDecision(
+        `conformance:study:cross:${index}`,
+        tier,
+        'Review study planner check',
+        experimentMapText(item.message) || 'Review this planner check.',
+        classified.routeId
+      ),
+    });
+  });
+
+  return entries
+    .sort((left, right) => TIER_ORDER.get(left.tier) - TIER_ORDER.get(right.tier) || left.order - right.order)
+    .map((entry) => entry.value);
+}
+
+/**
+ * Project a study into the UI-neutral Study map. `inputs` is optional so the
+ * projection is useful before KB/conformance has loaded; pass
+ * `{ conformance, workflow }` when those existing snapshots are available.
+ * Neither input is changed, and workflow is deliberately not used to decide
+ * orientation: its progress states are a consumer of this map, not a second
+ * priority authority.
+ */
+function buildExperimentMap(experiment, inputs = {}) {
+  const exp = object(experiment);
+  const options = object(inputs);
+  const context = object(exp.studyContext);
+  const provenance = object(exp.provenance);
+  const slots = object(provenance.slots);
+  const skipped = Array.isArray(provenance.skipped) ? provenance.skipped : [];
+  const assays = validAssays(exp);
+  const knownIds = new Set(assays.map((assay) => assay.id));
+
+  const questionValue = experimentMapText(exp.researchQuestion);
+  const systemValue = experimentMapText(context.system);
+  const unitValue = experimentMapText(context.experimentalUnit);
+  const mode = ['not-decided', 'groups', 'observational'].includes(context.comparisonMode)
+    ? context.comparisonMode
+    : 'not-decided';
+  const groups = levels(object(exp.groupVocabulary).levels);
+
+  const question = {
+    value: questionValue,
+    state: stateFor(questionValue, slots, ['researchQuestion'], skipped, ['research-question', 'researchQuestion']),
+  };
+  const system = {
+    value: systemValue,
+    state: stateFor(systemValue, slots, ['studyContext.system'], skipped, ['system', 'studyContext.system']),
+  };
+  const modeState = stateFor(
+    mode === 'not-decided' ? '' : mode,
+    slots,
+    ['studyContext.comparisonMode'],
+    skipped,
+    ['comparison-mode', 'studyContext.comparisonMode']
+  );
+  const groupsState =
+    mode === 'observational'
+      ? 'answered'
+      : stateFor(groups, slots, ['groupVocabulary'], skipped, ['comparison-groups', 'groupVocabulary']);
+  const comparison = {
+    mode,
+    groups,
+    state:
+      mode === 'not-decided'
+        ? modeState
+        : modeState !== 'answered'
+          ? modeState
+          : mode === 'observational'
+            ? 'answered'
+            : groupsState,
+  };
+  const experimentalUnit = {
+    value: unitValue,
+    state: stateFor(
+      unitValue,
+      slots,
+      ['studyContext.experimentalUnit'],
+      skipped,
+      ['experimental-unit', 'studyContext.experimentalUnit']
+    ),
+  };
+
+  const measurements = assays.map((assay, index) => {
+    const design = object(assay.design);
+    const acquisition = object(assay.acquisition);
+    const assayGroups = levels(object(design.groups).levels);
+    const state = measurementState(assay, slots, skipped, index);
+    return {
+      id: assay.id,
+      label: measurementLabel(assay, index),
+      readout: experimentMapText(assay.readoutText) || experimentMapText(assay.readout),
+      specimenSummary: specimenSummary(assay),
+      biologicalReplicates: design.biologicalReplicates ?? null,
+      technicalReplicates: design.technicalReplicates ?? null,
+      modality: experimentMapText(acquisition.modality),
+      groups: assayGroups,
+      state,
+    };
+  });
+
+  const byId = new Map(measurements.map((measurement) => [measurement.id, measurement]));
+  const decisions = [];
+  if (question.state !== 'answered') {
+    decisions.push(decision('research-question', 'study-shape', 'Describe the research question', 'The study map needs the question this work will answer.', 'home', question.state));
+  }
+  if (system.state !== 'answered') {
+    decisions.push(decision('system', 'study-shape', 'Describe the system or material', 'Name the organism, material, sample, surface, or system being studied.', 'home', system.state));
+  }
+  if (modeState !== 'answered') {
+    decisions.push(decision('comparison-mode', 'study-shape', 'Choose a comparison structure', 'Say whether this study compares groups or is observational.', 'home', modeState));
+  }
+  if (mode === 'groups' && groupsState !== 'answered') {
+    decisions.push(decision('comparison-groups', 'study-shape', 'Add comparison groups or conditions', 'A groups study needs its comparison labels.', 'study', groupsState));
+  }
+  const undefinedMeasurements = measurements.filter((measurement) => measurement.state !== 'answered');
+  if (measurements.length === 0) {
+    decisions.push(decision('measurement-definition', 'study-shape', 'Define a measurement', 'Add a named measurement and what it will observe.', 'study', 'missing'));
+  } else {
+    for (const measurement of undefinedMeasurements) {
+      decisions.push(decision(`measurement-definition:${measurement.id}`, 'study-shape', `Define ${measurement.label}`, 'A measurement needs both a name and a readout or intended observation.', 'study', measurement.state, measurement.id));
+    }
+  }
+  if (experimentalUnit.state !== 'answered') {
+    decisions.push(decision('experimental-unit', 'study-shape', 'Define the independent experimental unit', 'State what is independently assigned or sampled.', 'home', experimentalUnit.state));
+  }
+
+  for (const assay of orderedMeasurements(exp, assays)) {
+    const measurement = byId.get(assay.id);
+    const design = object(assay.design);
+    const assayGroups = levels(object(design.groups).levels);
+    const groupState =
+      mode === 'groups'
+        ? stateFor(assayGroups, slots, [`assay:${assay.id}.design.groups`], skipped, [`measurement-groups:${assay.id}`, `assay:${assay.id}.design.groups`])
+        : 'answered';
+    if (groupState !== 'answered') {
+      decisions.push(decision(`measurement-groups:${assay.id}`, 'measurement-design', `Define groups or factors for ${measurement.label}`, 'This measurement needs its own design definition.', 'design', groupState, assay.id));
+    }
+
+    const biologicalReplicates = design.biologicalReplicates;
+    const replicateState = stateFor(
+      biologicalReplicates,
+      slots,
+      [`assay:${assay.id}.design.biologicalReplicates`],
+      skipped,
+      [`biological-replicates:${assay.id}`, `assay:${assay.id}.design.biologicalReplicates`]
+    );
+    if (replicateState !== 'answered') {
+      decisions.push(decision(`biological-replicates:${assay.id}`, 'measurement-design', `Decide biological replicates for ${measurement.label}`, 'State the number of independent or biological replicates.', 'design', replicateState, assay.id));
+    }
+
+    const modality = experimentMapText(object(assay.acquisition).modality);
+    const modalityState = stateFor(
+      modality,
+      slots,
+      [`assay:${assay.id}.acquisition.modality`],
+      skipped,
+      [`modality:${assay.id}`, `assay:${assay.id}.acquisition.modality`]
+    );
+    if (modalityState !== 'answered') {
+      decisions.push(decision(`modality:${assay.id}`, 'before-acquisition', `Choose an acquisition method for ${measurement.label}`, 'Describe how this measurement will be acquired.', 'panel', modalityState, assay.id));
+    }
+  }
+
+  decisions.push(...conformanceDecisions(options.conformance, knownIds));
+
+  const orientationStates = [question.state, system.state, comparison.state, experimentalUnit.state];
+  const measurementOrientationState = measurements.some((measurement) => measurement.state === 'answered')
+    ? 'answered'
+    : measurements.some((measurement) => measurement.state === 'provisional')
+      ? 'provisional'
+      : 'missing';
+  orientationStates.splice(3, 0, measurementOrientationState);
+  const answered = orientationStates.filter((state) => state === 'answered').length;
+  const orientation = {
+    answered,
+    total: 5,
+    state: orientationStates.includes('needs-attention')
+      ? 'needs-attention'
+      : answered === 5
+        ? 'answered'
+        : orientationStates.includes('provisional')
+          ? 'provisional'
+          : 'missing',
+  };
+
+  return {
+    question,
+    system,
+    comparison,
+    experimentalUnit,
+    measurements,
+    decisions,
+    nextDecision: decisions[0] || null,
+    orientation,
+  };
+}
   // ---- src/engine/freetext.js ----
 // Deterministic free-text ingest: scan a pasted paragraph for markers,
 // replicate counts, magnification, and an ISO date -- with the LLM off.
@@ -9822,52 +11054,52 @@ function factorSummary(factors) {
 }
 
 function templateFor(stepId, facts) {
-  const assayLabel = text(facts.assay.label, 'the active assay');
+  const assayLabel = text(facts.assay.label, 'the active measurement');
   switch (stepId) {
     case 'home':
       return {
-        outcome: 'Orient yourself before editing the study.',
-        what: 'Home is the stable starting point for the study and its example actions.',
-        why: 'It makes the current study state visible before you decide whether to explore or edit.',
+        outcome: 'Understand the study’s shape before planning its details.',
+        what: 'Study map establishes the research question, system or material, comparison structure, measurements, and experimental unit.',
+        why: 'A study contains measurements; each measurement then has its own Samples & design, Acquisition, and Data plan.',
         when: 'Use it when opening the app, returning from another route, or restarting the walkthrough.',
-        how: 'Review the study at a glance, then move to the workflow step that answers your next question.',
-        tryThis: 'Notice the study title and how many assays are currently available.',
-        exampleSummary: `${plural(facts.assayCount, 'assay')} are currently included${facts.study.title ? ` in “${facts.study.title}”` : ''}.`,
+        how: 'Review the study at a glance, then move to the workspace that owns your next question.',
+        tryThis: 'Notice the study title and how many measurements are currently included.',
+        exampleSummary: `${plural(facts.assayCount, 'measurement')} are currently included${facts.study.title ? ` in “${facts.study.title}”` : ''}.`,
       };
     case 'describe':
       return {
-        outcome: 'Make the purpose and material of the active assay explicit.',
-        what: 'Project captures what this assay measures and the specimen it uses.',
-        why: 'A clear readout and specimen let later guidance stay tied to the actual assay.',
-        when: 'Use it when defining an assay or when its biological target changes.',
-        how: 'Choose the readout, then record the specimen details for the active assay.',
-        tryThis: 'Compare the active assay’s readout and specimen with the assay you intend to run.',
+        outcome: 'Make the shared purpose and active measurement details explicit.',
+        what: 'Research brief holds the study narrative and records what the active measurement will observe and its specimen or system.',
+        why: 'A clear readout and specimen let later guidance stay tied to the active measurement.',
+        when: 'Use it when defining a measurement or when its readout or specimen changes.',
+        how: 'Describe the shared question, then choose the readout and record specimen details for the active measurement.',
+        tryThis: 'Compare the active measurement’s readout and specimen with the measurement you intend to plan.',
         exampleSummary: `${assayLabel} currently measures ${text(facts.assay.readout.label, text(facts.assay.readout.text, 'an unanswered readout'))} in ${text(facts.assay.specimen.organism, 'an unspecified specimen')}.`,
       };
     case 'study':
       return {
-        outcome: 'Keep the shared research question and group vocabulary coherent across assays.',
-        what: 'Study holds the whole-study question and the shared treatment-group vocabulary.',
-        why: 'Shared terms prevent assay plans and filenames from drifting apart.',
-        when: 'Use it before adding assays or when the overarching experiment changes.',
-        how: 'State the research question, then set the group terms every applicable assay should use.',
-        tryThis: 'Read the question, then check that the shared group terms match your planned comparison.',
-        exampleSummary: `${text(facts.study.researchQuestion, 'No research question is recorded yet.')} Shared groups: ${list(facts.study.groupVocabulary, 'none yet')}.`,
+        outcome: 'Keep the study’s measurements and comparison labels coherent.',
+        what: 'Measurements lists the observations or analyses in the study and offers reusable comparison labels when helpful.',
+        why: 'Reusable labels keep applicable measurement plans and filenames aligned without overwriting a custom design.',
+        when: 'Use it when adding or naming measurements, or when the study’s comparison structure changes.',
+        how: 'State the research question, then name each measurement and add comparison labels only when they apply.',
+        tryThis: 'Read the question, then check that the comparison labels match your planned comparison or observational study.',
+        exampleSummary: `${text(facts.study.researchQuestion, 'No research question is recorded yet.')} Comparison labels: ${list(facts.study.groupVocabulary, 'none yet')}.`,
       };
     case 'design':
       return {
-        outcome: 'Turn the active assay into an explicit, reviewable condition plan.',
-        what: 'Design defines groups, crossed factors, replicate counts, and the resulting conditions.',
+        outcome: 'Turn the active measurement into an explicit, reviewable sample and condition plan.',
+        what: 'Samples & design defines groups, crossed factors, replicate counts, and the resulting conditions.',
         why: 'The condition matrix is the source for downstream filename planning and review.',
-        when: 'Use it after defining the assay and before collecting data.',
+        when: 'Use it after defining the measurement and before collecting data.',
         how: 'Set groups and factors, then review the generated conditions rather than calculating them by hand.',
         tryThis: 'Inspect the generated condition count and make sure every intended comparison is represented.',
         exampleSummary: `${assayLabel} has ${plural(facts.assay.design.conditionCount, 'generated condition')}: groups ${list(facts.assay.design.groups, 'none yet')}; factors ${factorSummary(facts.assay.design.factors)}.`,
       };
     case 'microscopy':
       return {
-        outcome: 'Connect acquisition choices with the assay’s panel and controls.',
-        what: 'Microscopy records the acquisition modality and exposes the resolved panel and relevant controls.',
+        outcome: 'Connect acquisition choices with the measurement’s panel and controls.',
+        what: 'Acquisition records the modality and exposes the resolved panel and relevant controls.',
         why: 'Acquisition settings and controls need to be assessed together for an interpretable result.',
         when: 'Use it while planning imaging or when a marker, channel, or modality changes.',
         how: 'Choose the modality, review the resolved panel rows, and consider the controls the study projection provides.',
@@ -9877,7 +11109,7 @@ function templateFor(stepId, facts) {
     case 'naming':
       return {
         outcome: 'Produce consistent, traceable filenames from the current plan.',
-        what: 'Naming combines the active assay’s effective naming fields with its generated condition rows.',
+        what: 'Data plan combines the active measurement’s effective naming fields with its generated condition rows.',
         why: 'Generated filenames make each acquired file traceable to its condition without manual reconstruction.',
         when: 'Use it once design and acquisition details are sufficiently specified to plan files.',
         how: 'Review the generated plan and correct source fields on their owning steps when a filename needs attention.',
@@ -9889,7 +11121,7 @@ function templateFor(stepId, facts) {
     case 'overview':
       return {
         outcome: 'Review the whole study’s current readiness before handoff or acquisition.',
-        what: 'Overview brings the study document and conformance result together in one review surface.',
+        what: 'Review brings the study map, document, and conformance result together in one review surface.',
         why: 'A single readiness result makes outstanding issues visible without silently redefining them.',
         when: 'Use it before exporting, sharing, or treating the plan as ready to run.',
         how: 'Read the readiness result, then follow each issue back to the step that owns its source field.',
@@ -11451,7 +12683,7 @@ function cardControlsSection(controls) {
  */
 function renderBenchCard(assay) {
   if (!assay || typeof assay !== 'object') {
-    return '_No such assay -- nothing to show on a bench card._';
+    return '_No such measurement -- nothing to show on a bench card._';
   }
 
   const specimenBits = [
@@ -11461,7 +12693,7 @@ function renderBenchCard(assay) {
   ].filter(Boolean);
 
   const lines = [
-    cardHeading(1, `Bench card -- ${assay.label || 'Untitled assay'}`),
+    cardHeading(1, `Measurement bench card -- ${assay.label || 'Untitled measurement'}`),
     '',
     `**Readout:** ${(assay.readout && assay.readout.text) || 'not answered yet'}`,
     `**Modality:** ${assay.modality || 'not answered yet'}`,
@@ -11479,7 +12711,7 @@ function renderBenchCard(assay) {
 
   const examples = (Array.isArray(assay.filenames) ? assay.filenames : []).filter((f) => f.filename).slice(0, 2);
   if (examples.length === 0) {
-    lines.push('_No planned filenames yet -- see the issues on the Design step._');
+    lines.push('_No planned filenames yet -- see the issues on the Samples & design step._');
   } else {
     for (const entry of examples) lines.push(`\`${entry.filename}\``);
   }
@@ -11952,9 +13184,11 @@ function renderProposalRequestPrompt(questions, narrative) {
 
 const PREAMBLE = [
   'You are reviewing a microscopy experiment plan produced by Micronaut Planner.',
-  'The JSON below is the complete plan: assays, readouts, modality, design axes,',
+  'The JSON below is the complete plan: measurements, readouts, modality, design axes,',
   'recommended controls (each with the reason it was recommended), the fluorophore',
   'panel, and every planned filename.',
+  'A measurement is one observation or analysis used to answer the study question; some disciplines call it an assay.',
+  'For compatibility, the machine-readable JSON keeps its measurements under the "assays" key.',
   '',
   'Ground rules for your answer:',
   '- Reason ONLY over what the JSON actually contains. Do not invent a marker, a',
@@ -12055,7 +13289,7 @@ function renderMermaid(doc) {
 
   for (const assay of doc.assays) {
     const aId = nodeId('assay', assay.index);
-    lines.push(`  STUDY --> ${aId}[${mermaidLabel(assay.label)}]`);
+    lines.push(`  STUDY --> ${aId}[${mermaidLabel(`Measurement: ${assay.label}`)}]`);
 
     const readoutId = nodeId(aId, 'readout');
     const readoutText =
@@ -12115,7 +13349,7 @@ function readoutSection(readout) {
 
 function designSection(design) {
   const lines = [];
-  lines.push(`**Design:** ${design.conditionCount} planned condition row(s).`);
+  lines.push(`**Samples & design:** ${design.conditionCount} planned condition row(s).`);
   if (design.groups.length > 0) lines.push(`- Groups (mutually exclusive): ${design.groups.join(', ')}`);
   for (const factor of design.factors) {
     lines.push(`- Crossing factor "${factor.name}": ${factor.levels.join(', ')}`);
@@ -12123,7 +13357,7 @@ function designSection(design) {
   if (design.biologicalReplicates) lines.push(`- Biological replicates: ${design.biologicalReplicates}`);
   if (design.technicalReplicates) lines.push(`- Technical replicates: ${design.technicalReplicates}`);
   if (design.issues.length > 0) {
-    lines.push('- **Design issues:**');
+    lines.push('- **Samples & design issues:**');
     for (const issue of design.issues) lines.push(`  - (${issue.severity}) ${issue.field}: ${issue.message}`);
   }
   return lines.join('\n');
@@ -12156,11 +13390,18 @@ function controlsSection(controls) {
 }
 
 /** The fixed 5-stage backbone, rendered ONCE for the whole study -- see studydoc.js's stageNotes comment for why. */
+function presentationLadderText(value) {
+  // `doc.ladder` retains the authored KB text verbatim for the document
+  // contract.  Markdown is a human-facing output, where the orientation
+  // vocabulary calls this unit of work a measurement.
+  return typeof value === 'string' ? value.replace(/\bassay\b/gi, 'measurement') : '';
+}
+
 function ladderSection(ladder) {
   const lines = [];
   for (const stage of ladder) {
-    lines.push(heading(3, stage.title));
-    lines.push(stage.body);
+    lines.push(heading(3, presentationLadderText(stage.title)));
+    lines.push(presentationLadderText(stage.body));
     lines.push('');
   }
   return lines.join('\n').trimEnd();
@@ -12169,7 +13410,7 @@ function ladderSection(ladder) {
 /** Per-assay STUDY-SPECIFIC notes only -- omitted entirely when an assay has none, per studydoc.js's stageNotes. */
 function stageNotesSection(stageNotes) {
   if (stageNotes.length === 0) return null;
-  const lines = ['**Notes for this assay:**'];
+  const lines = ['**Notes for this measurement:**'];
   for (const stage of stageNotes) {
     lines.push(`- ${stage.stageTitle}:`);
     for (const note of stage.notes) lines.push(`  - ${note}`);
@@ -12178,7 +13419,7 @@ function stageNotesSection(stageNotes) {
 }
 
 function filenamesSection(filenames) {
-  if (filenames.length === 0) return '_No planned filenames yet -- fill in the naming fields on the Naming step._';
+  if (filenames.length === 0) return '_No planned filenames yet -- fill in the filename fields on the Data plan step._';
   return '```\n' + filenames.map((f) => f.filename || `(${f.error})`).join('\n') + '\n```';
 }
 
@@ -12200,18 +13441,18 @@ function renderMarkdown(doc) {
   sections.push('```mermaid\n' + renderMermaid(doc) + '\n```');
 
   if (doc.crossAssayIssues.length > 0) {
-    sections.push(heading(2, 'Cross-assay issues'));
+    sections.push(heading(2, 'Cross-measurement issues'));
     sections.push(bulletList(doc.crossAssayIssues.map((i) => `(${i.severity}) ${i.field}: ${i.message}`)));
   }
 
   // Rendered ONCE for the whole study, not per assay -- see studydoc.js's
   // stageNotes comment. Assay-specific extras follow inside each assay's
   // own section below.
-  sections.push(heading(2, 'How to run this project'));
+  sections.push(heading(2, 'How to run this study'));
   sections.push(ladderSection(doc.ladder));
 
   for (const assay of doc.assays) {
-    sections.push(heading(2, `Assay ${assay.index}: ${assay.label}`));
+    sections.push(heading(2, `Measurement ${assay.index}: ${assay.label}`));
     sections.push(readoutSection(assay.readout));
     sections.push(`**Modality:** ${assay.modality || 'not answered yet'}`);
     const specimenBits = [assay.specimen.organism, assay.specimen.sampleType, assay.specimen.preparation].filter(Boolean);
@@ -12296,7 +13537,7 @@ function attrNodeContent(kind, assay) {
     case 'modality':
       return { caption: 'Modality', value: clip(assay.modality || 'not answered yet', 22) };
     case 'design':
-      return { caption: 'Design', value: clip(summarizeDesign(assay.design), 22) };
+      return { caption: 'Samples & design', value: clip(summarizeDesign(assay.design), 22) };
     case 'controls': {
       const controls = assay.controls || {};
       const n = (Array.isArray(controls.panel) ? controls.panel.length : 0) + (Array.isArray(controls.readout) ? controls.readout.length : 0);
@@ -12370,8 +13611,8 @@ function buildDiagramLayout(doc) {
       y: rowY(assayRowY, 0),
       w: NODE_W,
       h: NODE_H,
-      caption: `Assay ${assay.index != null ? assay.index : i + 1}`,
-      value: clip(assay.label || `Assay ${i + 1}`, 22),
+      caption: `Measurement ${assay.index != null ? assay.index : i + 1}`,
+      value: clip(assay.label || `Measurement ${i + 1}`, 22),
     });
 
     // Study fans out to each assay.
@@ -12601,13 +13842,15 @@ function buildSpectralViewModel(entries, overlapRules) {
 
 
 const PRIMARY_WORKFLOW = Object.freeze([
-  Object.freeze({ id: 'home', label: 'Home' }),
-  Object.freeze({ id: 'describe', label: 'Project' }),
-  Object.freeze({ id: 'study', label: 'Study' }),
-  Object.freeze({ id: 'design', label: 'Design' }),
-  Object.freeze({ id: 'microscopy', label: 'Microscopy' }),
-  Object.freeze({ id: 'naming', label: 'Naming' }),
-  Object.freeze({ id: 'overview', label: 'Overview' }),
+  Object.freeze({ id: 'home', label: 'Study map' }),
+  Object.freeze({ id: 'describe', label: 'Research brief' }),
+  Object.freeze({ id: 'study', label: 'Measurements' }),
+  Object.freeze({ id: 'design', label: 'Samples & design' }),
+  // Keep the workflow id as `microscopy`; main and the router deliberately
+  // translate it to the stable persisted/hash route id `panel`.
+  Object.freeze({ id: 'microscopy', label: 'Acquisition' }),
+  Object.freeze({ id: 'naming', label: 'Data plan' }),
+  Object.freeze({ id: 'overview', label: 'Review' }),
 ]);
 
 // Guide remains reachable but deliberately does not make the progress bar
@@ -12664,6 +13907,20 @@ function designProgress(design) {
 function readinessState(readiness) {
   if (readiness === 'ready') return 'complete';
   if (readiness === 'needs-review' || readiness === 'blocked') return 'needs-attention';
+  return 'not-started';
+}
+
+function orientationProgress(map) {
+  const orientation = map && typeof map.orientation === 'object' ? map.orientation : {};
+  const answered = Number.isInteger(orientation.answered) ? orientation.answered : 0;
+  const total = Number.isInteger(orientation.total) ? orientation.total : 0;
+
+  if (orientation.state === 'needs-attention') return 'needs-attention';
+  if (orientation.state === 'answered' || (total > 0 && answered >= total)) return 'complete';
+  // A skipped/provisional map answer is still an intentional orientation
+  // action. Likewise, some (but not all) answered map facts make the map
+  // in-progress even though its aggregate map state remains `missing`.
+  if (orientation.state === 'provisional' || answered > 0) return 'in-progress';
   return 'not-started';
 }
 
@@ -12740,13 +13997,17 @@ function reportForAssay(conformance, assayId) {
  * conformance report, and the already-loaded question bank.
  *
  * The return value is deterministic and intentionally UI-neutral:
- * `{ primary, optional, assays, summary }`. `primary` follows the ordered
- * seven-stage workflow; `optional` is Guide and must not contribute to the
- * summary. Per-assay `overview` consumes conformance's `readiness` verbatim,
- * and the study Overview mirrors the whole-study readiness verbatim.
+ * `{ map, primary, optional, assays, summary }`. `map` is the one Study-map
+ * snapshot built for this progress projection; consumers must use its
+ * decisions and nextDecision rather than recreate their ordering. `primary`
+ * follows the ordered seven-stage workflow; `optional` is Guide and must not
+ * contribute to the summary. Per-assay `overview` consumes conformance's
+ * `readiness` verbatim, and the study Overview mirrors the whole-study
+ * readiness verbatim.
  */
 function deriveWorkflowProgress(experiment, conformance, questions = []) {
   const exp = experiment && typeof experiment === 'object' ? experiment : {};
+  const map = buildExperimentMap(exp, { conformance });
   const assays = Array.isArray(exp.assays) ? exp.assays : [];
   const perAssay = assays.map((assay, index) => {
     const view = assayView(exp, assay && assay.id);
@@ -12768,7 +14029,7 @@ function deriveWorkflowProgress(experiment, conformance, questions = []) {
 
   const byStep = (step) => perAssay.map((assay) => assay.steps[step].state);
   const primary = [
-    { ...PRIMARY_WORKFLOW[0], state: 'complete' },
+    { ...PRIMARY_WORKFLOW[0], state: orientationProgress(map) },
     { ...PRIMARY_WORKFLOW[1], state: aggregate(byStep('project')) },
     { ...PRIMARY_WORKFLOW[2], state: studyProgress(exp, conformance, assays) },
     { ...PRIMARY_WORKFLOW[3], state: aggregate(byStep('design')) },
@@ -12779,6 +14040,7 @@ function deriveWorkflowProgress(experiment, conformance, questions = []) {
   const complete = primary.filter((step) => step.state === 'complete').length;
 
   return {
+    map,
     primary,
     optional: OPTIONAL_WORKFLOW.map((step) => ({ ...step })),
     assays: perAssay,
@@ -13378,7 +14640,12 @@ function savePreference(key, value) {
 function routeForWorkflow(id) { return id === 'microscopy' ? 'panel' : id; }
 function workflowForRoute(id) { return id === 'panel' ? 'microscopy' : id; }
 function stateLabel(state) {
-  return { 'not-started': 'Not started', 'in-progress': 'In progress', 'needs-attention': 'Needs review', complete: 'Complete' }[state] || 'Not started';
+  return {
+    'not-started': 'Not started',
+    'in-progress': 'In progress',
+    'needs-attention': 'Decision needed',
+    complete: 'Ready for now',
+  }[state] || 'Not started';
 }
 function saveLabel(saveState) {
   if (saveState?.status === 'saving') return 'Saving locally…';
@@ -13463,11 +14730,11 @@ function renderShell(root, store, router, options = {}) {
     utilityToggle.setAttribute('aria-expanded', 'false');
     if (focus) utilityToggle.focus();
   }
-  function action(label, callback, className = '') {
+  function action(label, callback, className = '', role = 'menuitem') {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `shell-utility-action ${className}`.trim();
-    button.setAttribute('role', 'menuitem');
+    button.setAttribute('role', role);
     button.textContent = label;
     button.addEventListener('click', () => { closeMenu(); callback(); });
     return button;
@@ -13523,7 +14790,11 @@ function renderShell(root, store, router, options = {}) {
       return;
     }
     recoveryEntries.forEach((entry, index) => {
-      const restore = action(`${index === 0 ? 'Latest: ' : ''}${entry.title || 'Untitled study'}`, () => onRestoreRecovery(entry.id), 'shell-restore-action');
+      const restore = action(`${index === 0 ? 'Latest: ' : ''}${entry.title || 'Untitled study'}`, () => {
+        if (window.confirm('Restore this saved version? Your current work remains available in Restore.')) {
+          onRestoreRecovery(entry.id);
+        }
+      }, 'shell-restore-action');
       restore.title = 'Restore this saved version';
       restoreList.appendChild(restore);
     });
@@ -13541,36 +14812,79 @@ function renderShell(root, store, router, options = {}) {
       : report;
     window.open(`${FEEDBACK_ISSUES_URL}?title=${encodeURIComponent('Feedback: ')}&body=${encodeURIComponent(body)}`, '_blank', 'noopener');
   }));
-  let theme = readPreference(THEME_KEY) || (osPrefersLight() ? 'light' : 'dark');
-  if (readPreference(THEME_KEY)) document.documentElement.setAttribute('data-theme', theme);
-  const appearance = action('', () => {
-    theme = theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', theme);
+  // A persisted theme is an explicit preference. With System selected, do
+  // not set a data-theme attribute so the stylesheet's media query can track
+  // the operating system as it changes.
+  const storedTheme = readPreference(THEME_KEY);
+  let theme = ['dark', 'light', 'system'].includes(storedTheme) ? storedTheme : 'system';
+  const themeGroup = document.createElement('div');
+  themeGroup.className = 'shell-theme-group';
+  const themeTitle = document.createElement('div');
+  themeTitle.className = 'shell-utility-heading';
+  themeTitle.textContent = 'Color mode';
+  themeGroup.appendChild(themeTitle);
+  const themeActions = new Map();
+  function applyTheme() {
+    if (theme === 'system') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', theme);
     savePreference(THEME_KEY, theme);
-    renderAppearance();
+    themeActions.forEach((button, mode) => {
+      const selected = mode === theme;
+      button.setAttribute('aria-checked', String(selected));
+      button.classList.toggle('is-selected', selected);
+    });
+  }
+  ['dark', 'light', 'system'].forEach((mode) => {
+    const label = mode === 'system' ? 'System' : `${mode[0].toUpperCase()}${mode.slice(1)} mode`;
+    const modeAction = action(label, () => {
+      theme = mode;
+      applyTheme();
+    }, 'shell-theme-action', 'menuitemradio');
+    modeAction.setAttribute('aria-checked', 'false');
+    themeActions.set(mode, modeAction);
+    themeGroup.appendChild(modeAction);
   });
-  function renderAppearance() { appearance.textContent = theme === 'dark' ? 'Use light appearance' : 'Use dark appearance'; }
-  renderAppearance();
-  utilityMenu.appendChild(appearance);
+  applyTheme();
+  utilityMenu.appendChild(themeGroup);
   utilities.append(utilityToggle, utilityMenu);
   headerActions.appendChild(utilities);
   header.append(brand, headerActions);
 
   const workflowStrip = document.createElement('section');
-  workflowStrip.className = 'workflow-strip';
-  workflowStrip.setAttribute('aria-label', 'Study workflow progress');
+  workflowStrip.className = 'workflow-strip experiment-compass';
+  workflowStrip.setAttribute('aria-label', 'Study map compass');
   const workflowSummary = document.createElement('span');
-  workflowSummary.className = 'workflow-summary';
+  // Keep the compass title independent of the legacy workflow-summary rule,
+  // which deliberately disappears at tablet widths. ORI-17 will own the
+  // settled visual treatment for this new compass selector.
+  workflowSummary.className = 'experiment-compass-title';
+  const compassDetails = document.createElement('div');
+  compassDetails.className = 'experiment-compass-details';
+  const compassScope = document.createElement('span');
+  compassScope.className = 'experiment-compass-scope';
+  const compassNext = document.createElement('div');
+  compassNext.className = 'experiment-compass-next';
   const workflowBadges = document.createElement('div');
   workflowBadges.className = 'workflow-badges';
-  workflowStrip.append(workflowSummary, workflowBadges);
+  workflowStrip.append(workflowSummary, compassDetails, compassScope, compassNext, workflowBadges);
 
   const mobileControls = document.createElement('section');
   mobileControls.className = 'shell-mobile-controls';
   mobileControls.setAttribute('aria-label', 'Workflow navigation');
+  const mobileCompass = document.createElement('div');
+  mobileCompass.className = 'shell-mobile-compass';
+  // This is deliberately kept in the existing mobile navigation surface so
+  // title and scope survive the desktop compass being collapsed at narrow
+  // widths. ORI-17 owns its final responsive styling.
+  mobileCompass.style.gridColumn = '1 / -1';
+  const mobileCompassTitle = document.createElement('span');
+  mobileCompassTitle.className = 'shell-mobile-compass-title';
+  const mobileCompassScope = document.createElement('span');
+  mobileCompassScope.className = 'shell-mobile-compass-scope';
+  mobileCompass.append(mobileCompassTitle, mobileCompassScope);
   const assayLabel = document.createElement('label');
   assayLabel.htmlFor = 'mobile-active-assay';
-  assayLabel.textContent = 'Assay';
+  assayLabel.textContent = 'Measurement';
   const assaySelect = document.createElement('select');
   assaySelect.id = 'mobile-active-assay';
   assaySelect.className = 'mobile-assay-select';
@@ -13579,15 +14893,15 @@ function renderShell(root, store, router, options = {}) {
   const stepSelect = document.createElement('select');
   stepSelect.id = 'mobile-workflow-step';
   stepSelect.className = 'mobile-step-select';
-  mobileControls.append(assayLabel, assaySelect, stepLabel, stepSelect);
+  mobileControls.append(mobileCompass, assayLabel, assaySelect, stepLabel, stepSelect);
 
   const switcher = document.createElement('div');
   switcher.className = 'assay-switcher-bar';
   switcher.setAttribute('role', 'tablist');
-  switcher.setAttribute('aria-label', 'Assays');
+  switcher.setAttribute('aria-label', 'Measurements');
   const switcherLabel = document.createElement('span');
   switcherLabel.className = 'assay-switcher-label';
-  switcherLabel.textContent = 'Active assay';
+  switcherLabel.textContent = 'Active measurement';
 
   function primarySteps() {
     return (Array.isArray(workflowProgress.primary) ? workflowProgress.primary : []).map((step) => ({ ...step, routeId: routeForWorkflow(step.id) }));
@@ -13597,6 +14911,117 @@ function renderShell(root, store, router, options = {}) {
   }
   function assayState(id) {
     return workflowProgress.assays?.find((assay) => assay?.id === id)?.state || 'not-started';
+  }
+  function compassText(value, fallback) {
+    return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+  }
+  function compassDisplayText(value, limit = 96) {
+    return value.length > limit ? `${value.slice(0, Math.max(1, limit - 1)).trimEnd()}…` : value;
+  }
+  function comparisonSummary(map) {
+    const comparison = map && typeof map.comparison === 'object' ? map.comparison : {};
+    const groups = Array.isArray(comparison.groups)
+      ? comparison.groups.filter((group) => typeof group === 'string' && group.trim()).map((group) => group.trim())
+      : [];
+    if (comparison.mode === 'observational') return 'Observational study';
+    if (comparison.mode === 'groups') return groups.length > 0 ? groups.join(' vs ') : 'Groups not decided';
+    return 'Not decided';
+  }
+  function measurementScope(experiment, map, routeId) {
+    // These are the existing active-assay workspaces. The shell only names
+    // their scope; each step remains responsible for its own data binding.
+    if (!['describe', 'design', 'panel', 'naming'].includes(routeId)) return 'Whole study';
+    const measurements = Array.isArray(map?.measurements) ? map.measurements : [];
+    const active = measurements.find((measurement) => measurement?.id === experiment.activeAssayId);
+    return `Measurement: ${compassText(active?.label, 'Not selected')}`;
+  }
+  function nextDecisionDestination(nextDecision, experiment) {
+    if (!nextDecision || typeof nextDecision !== 'object' || typeof nextDecision.routeId !== 'string') return null;
+    const routeId = routeForWorkflow(nextDecision.routeId);
+    if (!router.steps.some((step) => step.id === routeId)) return null;
+    const measurementId = typeof nextDecision.measurementId === 'string' ? nextDecision.measurementId : '';
+    if (measurementId && !(Array.isArray(experiment.assays) && experiment.assays.some((assay) => assay?.id === measurementId))) return null;
+    return { routeId, measurementId };
+  }
+  function renderCompass(activeId = router.current()) {
+    const experiment = store.get();
+    const map = workflowProgress.map && typeof workflowProgress.map === 'object' ? workflowProgress.map : {};
+    const measurements = Array.isArray(map.measurements) ? map.measurements : [];
+    const titleText = compassText(experiment.meta?.title, compassText(map.question?.value, 'Untitled study'));
+    const questionText = compassText(map.question?.value, 'Not decided');
+    const systemText = compassText(map.system?.value, 'Not decided');
+    const countText = `${measurements.length} measurement${measurements.length === 1 ? '' : 's'}`;
+    const scopeText = measurementScope(experiment, map, activeId);
+    const routeLabel = workflowStep(activeId)?.label || (activeId === 'guide' ? 'Guide' : 'Workspace');
+
+    workflowSummary.textContent = compassDisplayText(titleText);
+    workflowSummary.title = titleText;
+    workflowSummary.setAttribute('aria-label', titleText);
+    const scopeLine = `Now editing: ${scopeText} → ${routeLabel}`;
+    compassScope.textContent = compassDisplayText(scopeLine);
+    compassScope.title = scopeLine;
+    compassScope.setAttribute('aria-label', scopeLine);
+    mobileCompassTitle.textContent = compassDisplayText(titleText);
+    mobileCompassTitle.title = titleText;
+    mobileCompassTitle.setAttribute('aria-label', titleText);
+    mobileCompassScope.textContent = compassDisplayText(scopeText);
+    mobileCompassScope.title = scopeText;
+    mobileCompassScope.setAttribute('aria-label', scopeText);
+
+    compassDetails.textContent = '';
+    [
+      `Question: ${questionText}`,
+      `System: ${systemText}`,
+      `Comparison: ${comparisonSummary(map)}`,
+      countText,
+    ].forEach((text) => {
+      const detail = document.createElement('span');
+      detail.className = 'experiment-compass-detail';
+      detail.textContent = compassDisplayText(text);
+      detail.title = text;
+      detail.setAttribute('aria-label', text);
+      compassDetails.appendChild(detail);
+    });
+    if (experiment.meta?.origin === 'example') {
+      const ownership = document.createElement('span');
+      ownership.className = 'experiment-compass-example';
+      ownership.textContent = 'Example — changes are not your study';
+      compassDetails.appendChild(ownership);
+    }
+
+    compassNext.textContent = '';
+    const nextDecision = map.nextDecision && typeof map.nextDecision === 'object' ? map.nextDecision : null;
+    if (!nextDecision) {
+      compassNext.textContent = 'No outstanding map decision.';
+      return;
+    }
+    const nextLabel = `Next decision: ${compassText(nextDecision.label, 'Review the study map')}`;
+    const destination = nextDecisionDestination(nextDecision, experiment);
+    if (!destination) {
+      // A stale map must remain inert: never navigate, and especially never
+      // select a deleted measurement from an old decision payload.
+      compassNext.textContent = nextLabel;
+      return;
+    }
+    const nextButton = document.createElement('button');
+    nextButton.type = 'button';
+    nextButton.className = 'experiment-compass-next-action';
+    nextButton.textContent = nextLabel;
+    nextButton.addEventListener('click', () => {
+      const current = store.get();
+      const currentDestination = nextDecisionDestination(nextDecision, current);
+      if (!currentDestination) {
+        showToast('That measurement is no longer available.');
+        return;
+      }
+      // Validate against fresh state and select by stable id before the route
+      // renders; no decision/context logic is recreated in the shell.
+      if (currentDestination.measurementId && current.activeAssayId !== currentDestination.measurementId) {
+        store.patch({ activeAssayId: currentDestination.measurementId });
+      }
+      router.navigate(currentDestination.routeId);
+    });
+    compassNext.appendChild(nextButton);
   }
   function renderSwitcher(experiment) {
     switcher.replaceChildren(switcherLabel);
@@ -13610,7 +15035,7 @@ function renderShell(root, store, router, options = {}) {
       select.className = 'assay-pill-label';
       select.setAttribute('role', 'tab');
       select.setAttribute('aria-selected', String(active));
-      select.textContent = assay.label || `Assay ${index + 1}`;
+      select.textContent = assay.label || `Measurement ${index + 1}`;
       select.addEventListener('click', () => { if (assay.id !== store.get().activeAssayId) store.patch({ activeAssayId: assay.id }); });
       const badge = document.createElement('span');
       badge.className = `assay-progress-badge is-${assayState(assay.id)}`;
@@ -13621,10 +15046,10 @@ function renderShell(root, store, router, options = {}) {
         remove.type = 'button';
         remove.className = 'assay-pill-delete';
         remove.appendChild(createIcon('close', 'button-icon'));
-        remove.setAttribute('aria-label', `Delete ${assay.label || `Assay ${index + 1}`}`);
+        remove.setAttribute('aria-label', `Delete measurement ${assay.label || `Measurement ${index + 1}`}`);
         remove.addEventListener('click', (event) => {
           event.stopPropagation();
-          if (!window.confirm(`Delete "${assay.label || `Assay ${index + 1}`}"?`)) return;
+          if (!window.confirm(`Delete measurement "${assay.label || `Measurement ${index + 1}`}"?`)) return;
           const next = removeAssay(store.get(), assay.id);
           if (next) store.patch(next);
         });
@@ -13635,7 +15060,8 @@ function renderShell(root, store, router, options = {}) {
     const add = document.createElement('button');
     add.type = 'button';
     add.className = 'assay-pill-add';
-    add.textContent = '+ Add assay';
+    add.textContent = '+ Add measurement';
+    add.setAttribute('aria-label', 'Add measurement');
     add.disabled = assays.length >= MAX_STUDY_ROWS;
     add.addEventListener('click', () => {
       const current = store.get();
@@ -13703,8 +15129,7 @@ function renderShell(root, store, router, options = {}) {
 
   function renderWorkflowStrip() {
     const steps = primarySteps();
-    const complete = Number.isInteger(workflowProgress.summary?.complete) ? workflowProgress.summary.complete : steps.filter((step) => step.state === 'complete').length;
-    workflowSummary.textContent = `Workflow: ${complete} of ${steps.length || 7} complete`;
+    renderCompass();
     workflowBadges.textContent = '';
     steps.forEach((step) => {
       const badge = document.createElement('span');
@@ -13744,7 +15169,7 @@ function renderShell(root, store, router, options = {}) {
     const experiment = store.get();
     assaySelect.textContent = '';
     (Array.isArray(experiment.assays) ? experiment.assays : []).forEach((assay, index) => {
-      const option = document.createElement('option'); option.value = assay.id; option.textContent = assay.label || `Assay ${index + 1}`; option.selected = assay.id === experiment.activeAssayId; assaySelect.appendChild(option);
+      const option = document.createElement('option'); option.value = assay.id; option.textContent = assay.label || `Measurement ${index + 1}`; option.selected = assay.id === experiment.activeAssayId; assaySelect.appendChild(option);
     });
     const steps = primarySteps();
     stepSelect.textContent = '';
@@ -13761,20 +15186,35 @@ function renderShell(root, store, router, options = {}) {
     const steps = primarySteps();
     const index = steps.findIndex((step) => step.routeId === activeId);
     const currentStep = workflowStep(activeId);
+    const mapDecision = workflowProgress.map?.nextDecision;
+    const mapDestination = nextDecisionDestination(mapDecision, store.get());
     position.textContent = index === -1 ? 'Guide (optional)' : `Step ${index + 1} of ${steps.length}`;
     back.disabled = index <= 0;
-    next.disabled = index === -1 || index >= steps.length - 1;
+    next.disabled = mapDestination === null && (index === -1 || index >= steps.length - 1);
+    next.textContent = mapDestination ? 'Continue to next decision' : 'Continue';
     explain.disabled = !currentStep || typeof explainStepHandler !== 'function';
     back.onclick = () => { if (index > 0) router.navigate(steps[index - 1].routeId); };
-    next.onclick = () => { if (index !== -1 && index < steps.length - 1) router.navigate(steps[index + 1].routeId); };
+    next.onclick = () => {
+      if (mapDestination) {
+        const current = store.get();
+        const freshDestination = nextDecisionDestination(mapDecision, current);
+        if (!freshDestination) return;
+        if (freshDestination.measurementId && current.activeAssayId !== freshDestination.measurementId) {
+          store.patch({ activeAssayId: freshDestination.measurementId });
+        }
+        router.navigate(freshDestination.routeId);
+        return;
+      }
+      if (index !== -1 && index < steps.length - 1) router.navigate(steps[index + 1].routeId);
+    };
     // currentStep.id is the canonical workflow id: workflowStep() applies
     // the existing panel -> microscopy alias in one shared place.
     explain.onclick = () => {
       if (currentStep && typeof explainStepHandler === 'function') explainStepHandler(currentStep.id);
     };
   }
-  router.onChange((id) => { renderNav(id); renderMobileControls(id); renderFooter(id); });
-  store.subscribe((state) => { renderSwitcher(state); renderMobileControls(router.current()); });
+  router.onChange((id) => { renderCompass(id); renderNav(id); renderMobileControls(id); renderFooter(id); });
+  store.subscribe((state) => { renderCompass(router.current()); renderSwitcher(state); renderMobileControls(router.current()); });
   renderSwitcher(store.get());
   renderWorkflowStrip();
   renderNav(router.current());
@@ -13808,10 +15248,6 @@ function renderShell(root, store, router, options = {}) {
       body.classList.toggle('has-guided-aside', isVisible);
     },
   };
-}
-
-function osPrefersLight() {
-  return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: light)').matches;
 }
   // ---- src/ui/advice.js ----
 // The advice panel: renders the modality-guidance notes engine/advisor.js
@@ -14680,11 +16116,11 @@ const STATUS_TEXT = {
   idle: 'No review yet. Add a description, then choose Review description.',
   scanning: 'Checking exact text matches…',
   'model-running': 'Exact matches are ready. Checking with your local model…',
-  complete: 'Review complete. Nothing has been added to your project.',
-  fallback: 'The local model could not be reached. Your description is still saved, and nothing was added to the project.',
+  complete: 'Review complete. Nothing has been added to your study.',
+  fallback: 'The local model could not be reached. Your description is still saved, and nothing was added to the study.',
   stale: 'Description changed — review again before accepting suggestions.',
   cancelled: 'Model review cancelled. Exact matches remain available.',
-  error: 'Review needs your attention. Nothing has been added to your project.',
+  error: 'Review needs your attention. Nothing has been added to your study.',
 };
 
 const SOURCE_LABELS = {
@@ -14821,7 +16257,7 @@ function createProjectReview({
     element,
     'p',
     'project-review-session-disclosure',
-    'Suggestions stay in this tab until you change the description or switch assays. Accept a suggestion to save it.'
+    'Suggestions stay in this tab until you change the description or switch measurements. Accept a suggestion to save it.'
   );
   appendText(
     element,
@@ -14884,7 +16320,7 @@ function createProjectReview({
     fallbackDetails,
     'p',
     'project-review-fallback-hint',
-    'Copy the prompt into a model you choose, then paste only its reply here. Pasting never changes your project by itself.'
+    'Copy the prompt into a model you choose, then paste only its reply here. Pasting never changes your study by itself.'
   );
   fallbackHint.id = 'project-review-fallback-hint';
 
@@ -15212,7 +16648,7 @@ function createDescribeStep(kb) {
 
   return {
     id: 'describe',
-    title: 'Project',
+    title: 'Research brief',
     render(main, store, { showToast, advisor, experience } = {}) {
       // Route/assay rendering replaces the DOM. Invalidate any old request so
       // it cannot mutate this persistent session after a newer render starts.
@@ -15230,17 +16666,22 @@ function createDescribeStep(kb) {
 
       const heading = document.createElement('h1');
       heading.className = 'step-heading';
-      heading.textContent = 'Project';
+      heading.textContent = 'Research brief';
       narrativeCard.appendChild(heading);
+
+      const scope = document.createElement('p');
+      scope.className = 'project-description-help';
+      scope.textContent = 'Shared across the whole study. Suggestions are never applied automatically.';
+      narrativeCard.appendChild(scope);
 
       const intro = document.createElement('p');
       intro.className = 'proposals-empty';
-      intro.textContent = 'Start with the experiment itself -- the question, the organism, why you’re running it -- before any microscope decision. Project design, then Microscopy.';
+      intro.textContent = 'Describe the whole study -- its question, system or material, and purpose -- before planning individual measurement details.';
       narrativeCard.appendChild(intro);
 
       const descriptionLabel = document.createElement('label');
       descriptionLabel.htmlFor = 'project-description';
-      descriptionLabel.textContent = 'Project description';
+      descriptionLabel.textContent = 'Study description';
       narrativeCard.appendChild(descriptionLabel);
 
       const textarea = document.createElement('textarea');
@@ -15296,12 +16737,12 @@ function createDescribeStep(kb) {
       const renderAssays = Array.isArray(store.get().assays) ? store.get().assays : [];
       const activeAssayIndex = renderAssays.findIndex((assay) => assay && assay.id === renderAssayId);
       const activeAssay = activeAssayIndex === -1 ? null : renderAssays[activeAssayIndex];
-      const activeAssayLabel = activeAssay?.label || `Assay ${Math.max(0, activeAssayIndex) + 1}`;
-      detailsHeading.textContent = `Project details for ${activeAssayLabel}`;
+      const activeAssayLabel = activeAssay?.label || `Measurement ${Math.max(0, activeAssayIndex) + 1}`;
+      detailsHeading.textContent = `Measurement details — ${activeAssayLabel}`;
       details.appendChild(detailsHeading);
       const assayBinding = document.createElement('p');
       assayBinding.className = 'project-details-assay-binding';
-      assayBinding.textContent = `Accepted assay details will apply to: ${activeAssayLabel}.`;
+      assayBinding.textContent = `Accepted measurement details will apply only to: ${activeAssayLabel}.`;
       details.appendChild(assayBinding);
       const fieldHost = document.createElement('div');
       fieldHost.className = 'project-details-fields';
@@ -15395,7 +16836,7 @@ function createDescribeStep(kb) {
             const address = scopeWrite(experiment, question.field, activeId);
             if (!store.setPath(address.path, value, tag, { slotKey: address.slotKey })) return;
             if (!writeReadoutCanonicalIfNeeded(store, question, value, tag, activeId, kb)) {
-              if (showToast) showToast('The linked readout value could not be saved. The Project field remains visible.');
+              if (showToast) showToast('The linked readout value could not be saved. The measurement field remains visible.');
               return;
             }
             unskipQuestion(store.get(), question.id);
@@ -15480,14 +16921,14 @@ function createDescribeStep(kb) {
         const candidate = candidateIndex === -1 ? null : state.candidates[candidateIndex];
         const binding = freshBinding();
         if (!session || !candidate || !candidate.actionable || binding.narrative !== session.narrative || binding.assayId !== session.assayId) {
-          addSessionIssue('This suggestion is no longer bound to the current description and assay. Review again before accepting it.');
+          addSessionIssue('This suggestion is no longer bound to the current description and measurement. Review again before accepting it.');
           if (session) session.status = 'stale';
           renderReview();
           return;
         }
         const question = questionBank.find((item) => item.field === candidate.path);
         if (!question) {
-          addSessionIssue('This suggestion no longer maps to a supported Project field.');
+          addSessionIssue('This suggestion no longer maps to a supported Research brief field.');
           renderReview();
           return;
         }
@@ -15498,7 +16939,7 @@ function createDescribeStep(kb) {
         try {
           address = scopeWrite(experiment, question.field, binding.assayId);
         } catch {
-          addSessionIssue('The active assay changed before this suggestion could be saved.');
+          addSessionIssue('The active measurement changed before this suggestion could be saved.');
           session.status = 'stale';
           renderReview();
           return;
@@ -15546,7 +16987,7 @@ function createDescribeStep(kb) {
         const text = textarea.value;
         if (!text.trim()) {
           textarea.focus();
-          emptyAlert.textContent = 'Add a project description before reviewing it.';
+          emptyAlert.textContent = 'Add a study description before reviewing it.';
           emptyAlert.hidden = false;
           return;
         }
@@ -15800,7 +17241,7 @@ function createNamingStep(kb) {
   }
   return {
   id: 'naming',
-  title: 'Naming',
+  title: 'Data plan',
   render(main, store, { advisor, experience } = {}) {
     main.textContent = '';
 
@@ -15812,8 +17253,21 @@ function createNamingStep(kb) {
 
     const heading = document.createElement('h1');
     heading.className = 'step-heading';
-    heading.textContent = 'Name builder';
+    heading.textContent = 'Data plan';
     main.appendChild(heading);
+
+    const activeAssay = assayById(store.get(), assayId);
+    const activeAssayLabel = activeAssay?.label || 'this measurement';
+    const scope = document.createElement('p');
+    scope.className = 'proposals-empty';
+    scope.textContent = `Planning files and work for: ${activeAssayLabel}.`;
+    main.appendChild(scope);
+
+    const filenameGuidance = document.createElement('p');
+    filenameGuidance.className = 'proposals-empty';
+    filenameGuidance.textContent =
+      'Enter the details needed for a final filename here. Date, sample ID, and instrument label may be assigned later on acquisition day; until then previews use clearly labelled placeholders. Final exports remain guarded by planner checks.';
+    main.appendChild(filenameGuidance);
 
     const grid = document.createElement('div');
     grid.className = 'naming-grid';
@@ -15900,6 +17354,10 @@ function createNamingStep(kb) {
     const plannedList = document.createElement('div');
     plannedList.className = 'planned-list';
     plannedBox.appendChild(plannedList);
+
+    const placeholderStatus = document.createElement('div');
+    placeholderStatus.className = 'planned-empty';
+    plannedBox.appendChild(placeholderStatus);
     main.appendChild(plannedBox);
 
     // --- Schedule (zen-planner Phase 1's timing interview + .ics export) --
@@ -16035,6 +17493,7 @@ function createNamingStep(kb) {
 
     function update() {
       const view = currentExperimentView();
+      const rawFields = currentRawFields();
       lastPlanned = planFilenames(view, NAMING_CONFIG);
       advicePanel.update(view);
 
@@ -16058,11 +17517,36 @@ function createNamingStep(kb) {
         plannedList.appendChild(line);
       }
 
+      // Defaults remain in the preview filename exactly as the naming engine
+      // produces them. This legend makes it clear that they were generated
+      // for preview rather than supplied by the researcher.
+      const generatedPlaceholders = FIELD_DEFS.filter(
+        (field) => Object.prototype.hasOwnProperty.call(NAMING_CONFIG.defaults, field.key) && !rawFields[field.key]
+      );
+      placeholderStatus.textContent = '';
+      if (generatedPlaceholders.length === 0) {
+        placeholderStatus.textContent = 'Every required filename value in this preview was supplied.';
+      } else {
+        const intro = document.createElement('p');
+        intro.textContent = 'Generated preview placeholders — not supplied values:';
+        placeholderStatus.appendChild(intro);
+        const list = document.createElement('ul');
+        for (const field of generatedPlaceholders) {
+          const item = document.createElement('li');
+          const value = document.createElement('mark');
+          value.textContent = NAMING_CONFIG.defaults[field.key];
+          item.appendChild(value);
+          item.append(` is a generated placeholder for ${field.label}.`);
+          list.appendChild(item);
+        }
+        placeholderStatus.appendChild(list);
+      }
+
       // Field-level validation runs against the fields as typed. The
       // path-length check runs per PLANNED NAME, deduped: with a design, the
       // longest row is the one that actually risks exceeding MAX_PATH, and N
       // equally-long rows should not produce N copies of one warning.
-      const finalized = finalizeFields('experiment.tif', currentRawFields(), NAMING_CONFIG);
+      const finalized = finalizeFields('experiment.tif', rawFields, NAMING_CONFIG);
       const issues = validateFields(finalized, DEFAULT_PROFILE);
       const pathMessages = new Set();
       for (const name of currentFilenames()) {
@@ -16122,8 +17606,8 @@ function baseNameFor(store, assayId) {
 
 const designStep = {
   id: 'design',
-  title: 'Design',
-  render(main, store, { advisor } = {}) {
+  title: 'Samples & design',
+  render(main, store, { advisor, router } = {}) {
     main.textContent = '';
 
     // Commit 1 of the assay tier (schema v3): every experiment has exactly
@@ -16134,8 +17618,51 @@ const designStep = {
 
     const heading = document.createElement('h1');
     heading.className = 'step-heading';
-    heading.textContent = 'Experimental design';
+    heading.textContent = 'Samples & design';
     main.appendChild(heading);
+
+    // This scope label is deliberately derived from the active assay captured
+    // for this render, just like every scoped write below. The experimental
+    // unit itself remains study-level: this step displays it but never offers
+    // a second editor or infers a replicate count from its wording.
+    const assays = Array.isArray(store.get().assays) ? store.get().assays : [];
+    const activeAssayIndex = assays.findIndex((assay) => assay && assay.id === assayId);
+    const activeAssay = activeAssayIndex === -1 ? null : assays[activeAssayIndex];
+    const activeMeasurementLabel = activeAssay?.label ||
+      (activeAssayIndex === -1 ? 'Active measurement' : `Measurement ${activeAssayIndex + 1}`);
+    const scope = document.createElement('p');
+    scope.className = 'proposals-empty';
+    scope.textContent = `Planning samples and design for: ${activeMeasurementLabel}.`;
+    main.appendChild(scope);
+
+    const unitRow = document.createElement('div');
+    unitRow.className = 'field-row';
+    const unitLabel = document.createElement('span');
+    unitLabel.className = 'field-label';
+    unitLabel.textContent = 'Experimental unit (study-wide)';
+    unitRow.appendChild(unitLabel);
+    const unitValue = document.createElement('span');
+    unitValue.className = 'base-name-value';
+    const experimentalUnit = store.get().studyContext?.experimentalUnit;
+    unitValue.textContent =
+      typeof experimentalUnit === 'string' && experimentalUnit.trim() ? experimentalUnit.trim() : 'Not decided';
+    unitRow.appendChild(unitValue);
+    const editUnitButton = document.createElement('button');
+    editUnitButton.type = 'button';
+    editUnitButton.className = 'question-answer';
+    editUnitButton.textContent = 'Edit on Study map';
+    editUnitButton.title = 'Edit the study-wide experimental unit on the Study map.';
+    editUnitButton.addEventListener('click', () => {
+      if (router) router.navigate('home');
+    });
+    unitRow.appendChild(editUnitButton);
+    main.appendChild(unitRow);
+
+    const hierarchyHelp = document.createElement('p');
+    hierarchyHelp.className = 'proposals-empty';
+    hierarchyHelp.textContent =
+      'An experimental unit is what is independently assigned or sampled for the whole study. A biological (independent) replicate is another such unit; a technical replicate is a repeated measurement of the same unit. Groups are mutually exclusive alternatives, while factors can cross groups or one another to form combinations.';
+    main.appendChild(hierarchyHelp);
 
     function currentDesign() {
       return (
@@ -16291,9 +17818,9 @@ const designStep = {
     }
 
     const bioRepInput = makeReplicatesRow(
-      'Biological replicates',
+      'Biological / independent replicates',
       'design.biologicalReplicates',
-      "How many biological replicates you have -- different animals, dishes, or samples. Leave blank if this doesn't apply to your experiment."
+      "How many independently assigned or sampled units you have. Leave blank if this doesn't apply to your experiment."
     );
     const techRepInput = makeReplicatesRow(
       'Technical replicates',
@@ -16707,11 +18234,7 @@ const guideStep = {
 
     para(
       main,
-      'Micronaut Planner helps you design a microscopy experiment before you acquire ' +
-        'anything: you describe what you are measuring, and it works out the groups and ' +
-        'controls you need, flags common pitfalls for your modality, and produces a ' +
-      'consistent file-naming convention as a by-product of the finished design. ' +
-        'Everything runs in your browser — no upload, no install, no account. The optional guided example covers Home through Overview; this Guide is reference material, not another guided step.'
+      'Micronaut Planner helps you plan a study before collecting data: describe what you are measuring, then plan comparisons, controls, acquisition, and files. A study contains measurements; each measurement has its own Samples & design, Acquisition, and Data plan, while Review considers the whole study. Everything runs in your browser — no upload, no install, no account. The optional guided example covers Study map through Review; this Guide is reference material, not another guided step.'
     );
 
     // --- Search (zen-planner Phase 5's "searchable wiki") -----------------
@@ -16759,23 +18282,23 @@ const guideStep = {
       section(main, 'The steps', (c) => {
         para(
           c,
-          'For a guided example, start at Home — it can open, resume, or restart the optional ' +
+          'For a guided example, start at Study map — it can open, resume, or restart the optional ' +
             'seven-step walkthrough. This list is a quick reference for what each ' +
             'step in the left nav means. Use the steps in any order — the app works outside-in — ' +
-            'and note a study can hold several assays, switched with the tab row at the top.'
+            'and note a study can hold several measurements, switched with the tab row at the top.'
         );
         defList(c, [
-          ['Home', 'Landing page: optional guided example, description, or worked example.'],
-          ['Project', 'Per assay: readout, organism/cell line, sample type, preparation.'],
-          ['Study', 'Study-wide question, shared group vocabulary, and assay list.'],
-          ['Design', 'Per assay: control/treatment groups, crossing factors, replicate counts.'],
+          ['Study map', 'Whole study: question, system or material, comparison structure, measurements, and experimental unit.'],
+          ['Research brief', 'Whole-study narrative plus the active measurement’s readout, specimen, and intended observation.'],
+          ['Measurements', 'Measurement list, names, and reusable comparison labels.'],
+          ['Samples & design', 'Per measurement: groups or factors, independent and technical replicates, and conditions.'],
           [
-            'Microscopy',
-            'Per assay: instrument, modality, magnification, markers, spectral-overlap check, ' +
+            'Acquisition',
+            'Per measurement: instrument, modality, magnification, markers, spectral-overlap check, ' +
               'and an optional panel editor.',
           ],
-          ['Naming', 'Filename template and fields, plus the bench-schedule (.ics) export.'],
-          ['Overview', 'Read-only summary: study map, conformance check, controls, filenames.'],
+          ['Data plan', 'Per measurement: filename template and fields, plus the bench-schedule (.ics) export.'],
+          ['Review', 'Whole-study summary: study map, conformance check, controls, and planned files.'],
         ]);
       })
     );
@@ -16783,10 +18306,8 @@ const guideStep = {
     trackSection(
       section(main, 'Getting started', (c) => {
         bullets(c, [
-          'You open onto a real worked example (an oregano wound-healing study) so nothing ' +
-            'starts blank. Edit any field and your change always wins over the example.',
-          'Start your own: use “New study” in the header for a blank slate, or “Reset to ' +
-            'example” to reload the example and undo your edits.',
+          'Choose “Plan my study” to start your own Study map, or “Explore a completed example” to inspect the oregano plan. The example is not your data.',
+          'Make a copy before treating an example as your own plan. You can return to the completed example without replacing your study.',
           'You do not have to answer everything. Fields you skip are simply marked as not set; ' +
             'the app still produces whatever it can from what you have entered.',
         ]);
@@ -16797,15 +18318,12 @@ const guideStep = {
       section(main, 'Key ideas', (c) => {
         defList(c, [
           [
-            'Assay',
-            'One measurement approach within a study — its own readout, panel, specimen, and ' +
-              'modality. Real studies often bundle several assays that share only a question and ' +
-              'a test article.',
+            'Measurement',
+            'One observation or analysis used to answer the study question — its own readout, panel, specimen, and modality. In some fields, a measurement is called an assay.',
           ],
           [
-            'Group vocabulary',
-            'The comparison groups shared across the study (e.g. control, treatment). Applying it ' +
-              'fills each assay’s groups, except any assay you have already customized.',
+            'Comparison labels',
+            'Reusable comparison labels (e.g. control, treatment). They seed a measurement’s groups when helpful, but never overwrite a measurement you have already customized. Observational studies may have none.',
           ],
           [
             'Readout',
@@ -16836,17 +18354,17 @@ const guideStep = {
       section(main, 'What you get out', (c) => {
         bullets(c, [
           'A consistent set of planned filenames for every condition in the design.',
-          'A visual study map (Overview) you can download as an SVG.',
+          'A visual study map (Review) you can download as an SVG.',
           'An exportable study document (Markdown) and a print / save-as-PDF view.',
           'A file manifest (CSV) — one row per planned filename with its group, factors, and ' +
-            'replicates — and a full raw-data dump (JSON) of the study document, both on Overview.',
-          'A bench card per assay (Overview) — a compact, print-oriented single-assay summary: ' +
+            'replicates — and a full raw-data dump (JSON) of the study document, both on Review.',
+          'A bench card per measurement (Review) — a compact, print-oriented single-measurement summary: ' +
             'channels, controls with their reasons, and two worked filename examples.',
-          'A bench schedule (.ics, Naming) built from your own timing answers — imports into ' +
+          'A bench schedule (.ics, Data plan) built from your own timing answers — imports into ' +
             'Google Calendar, Outlook, or Apple Calendar with no login.',
-          'A copy-paste prompt for your own LLM (Overview) — the study as JSON plus ground rules ' +
+          'A copy-paste prompt for your own LLM (Review) — the study as JSON plus ground rules ' +
             'that keep the model from inventing a domain fact.',
-          'Project review first finds exact supported text in your description. You can optionally ' +
+          'Research brief review first finds exact supported text in your description. You can optionally ' +
             'use a local Ollama model or copy and paste a model reply in place; every interpretation ' +
             'shows quoted evidence from your description, and nothing becomes a structured field until ' +
             'you explicitly accept it.',
@@ -16861,7 +18379,7 @@ const guideStep = {
           'Your work is autosaved in this browser, so a refresh restores it. Local storage is a ' +
             'convenience, not a safe record — it can be cleared by the browser, is not shared ' +
             'between machines, and is lost in private/incognito windows. To keep a copy, use the ' +
-            'Download buttons on the Overview step.'
+            'Download buttons on the Review step.'
         );
       })
     );
@@ -16886,6 +18404,517 @@ const guideStep = {
     );
   },
 };
+  // ---- src/ui/studyMap.js ----
+// Reusable, DOM-only Study map.  It owns the page-level orientation
+// interaction, but deliberately does not own persistence, routing rules, or
+// decision ordering: those stay with the injected store/router and the pure
+// experiment-map projection respectively.
+
+
+const ORIENTATION_QUESTIONS = Object.freeze([
+  Object.freeze({ id: 'research-question', skipIds: ['research-question', 'researchQuestion'] }),
+  Object.freeze({ id: 'system', skipIds: ['system', 'studyContext.system'] }),
+  Object.freeze({ id: 'comparison-mode', skipIds: ['comparison-mode', 'studyContext.comparisonMode'] }),
+  Object.freeze({ id: 'measurement', skipIds: [] }),
+  Object.freeze({ id: 'experimental-unit', skipIds: ['experimental-unit', 'studyContext.experimentalUnit'] }),
+]);
+
+function studyMapText(value) {
+  return typeof value === 'string' ? value : '';
+}
+
+function input(doc, { id, label, value, placeholder, help, multiline = false, onInput }) {
+  const row = doc.createElement('div');
+  row.className = 'field-row study-map-field';
+  const labelEl = doc.createElement('label');
+  labelEl.className = 'field-label';
+  labelEl.htmlFor = id;
+  labelEl.textContent = label;
+  row.appendChild(labelEl);
+  const control = doc.createElement(multiline ? 'textarea' : 'input');
+  control.id = id;
+  control.className = 'field-input';
+  if (!multiline) control.type = 'text';
+  control.value = value;
+  control.placeholder = placeholder;
+  if (help) {
+    const helpId = `${id}-help`;
+    control.setAttribute('aria-describedby', helpId);
+    const helpEl = doc.createElement('p');
+    helpEl.id = helpId;
+    helpEl.className = 'proposals-empty';
+    helpEl.textContent = help;
+    row.append(control, helpEl);
+  } else {
+    row.appendChild(control);
+  }
+  if (typeof onInput === 'function') control.addEventListener('input', () => onInput(control.value));
+  return { row, control };
+}
+
+function studyMapButton(doc, className, label, onClick) {
+  const control = doc.createElement('button');
+  control.type = 'button';
+  control.className = className;
+  control.textContent = label;
+  control.addEventListener('click', onClick);
+  return control;
+}
+
+function uniqueLevels(raw) {
+  const seen = new Set();
+  return String(raw)
+    .split(/[\n,]/)
+    .map((value) => value.trim())
+    .filter((value) => {
+      if (!value || seen.has(value.toLocaleLowerCase())) return false;
+      seen.add(value.toLocaleLowerCase());
+      return true;
+    });
+}
+
+function knownMeasurementIds(experiment) {
+  const assays = Array.isArray(experiment && experiment.assays) ? experiment.assays : [];
+  return new Set(assays.map((assay) => assay && assay.id).filter((id) => typeof id === 'string' && id));
+}
+
+function nextUnusedId(experiment) {
+  const known = knownMeasurementIds(experiment);
+  for (let attempts = 0; attempts < 20; attempts += 1) {
+    const id = shortId();
+    if (!known.has(id)) return id;
+  }
+  return null;
+}
+
+/**
+ * Create a Study-map controller. `getMap` is optional for consumers that
+ * already have a shared workflow snapshot; otherwise the canonical pure map
+ * is built from the current study.  The controller does not subscribe on its
+ * own, so typing into an editable summary cannot rebuild an input and lose
+ * its caret. Its owner calls `refresh()` whenever an external store change
+ * needs to be reflected.
+ */
+function createStudyMap({ store, router, getMap, document: suppliedDocument } = {}) {
+  if (!store || typeof store.get !== 'function' || typeof store.setPath !== 'function' || typeof store.patch !== 'function') {
+    throw new Error('createStudyMap requires a store with get(), setPath(), and patch().');
+  }
+  const doc = suppliedDocument || globalThis.document;
+  if (!doc || typeof doc.createElement !== 'function') {
+    throw new Error('createStudyMap requires a DOM document.');
+  }
+
+  const element = doc.createElement('section');
+  element.className = 'study-map-editor';
+  element.setAttribute('aria-label', 'Study map');
+  let intakeStep = null;
+  let destroyed = false;
+
+  function mapForCurrentStudy() {
+    const study = store.get();
+    if (typeof getMap === 'function') {
+      const supplied = getMap(study);
+      if (supplied && typeof supplied === 'object') return supplied;
+    }
+    return buildExperimentMap(study);
+  }
+
+  function tagFor(slotKey) {
+    return editTagFor(store.get().provenance?.slots?.[slotKey]?.tag ?? null);
+  }
+
+  function write(path, value, slotKey = path) {
+    return store.setPath(path, value, tagFor(slotKey), { slotKey });
+  }
+
+  function markSkipped(ids) {
+    const candidates = ids.filter(Boolean);
+    if (candidates.length === 0) return;
+    store.patch((state) => {
+      const provenance = state.provenance && typeof state.provenance === 'object' ? state.provenance : {};
+      const previous = Array.isArray(provenance.skipped) ? provenance.skipped : [];
+      const skipped = [...previous];
+      for (const id of candidates) {
+        if (!skipped.includes(id)) skipped.push(id);
+      }
+      return { provenance: { ...provenance, skipped } };
+    });
+  }
+
+  function measurementForIntake(map) {
+    const target = Array.isArray(map.measurements)
+      ? map.measurements.find((measurement) => measurement && measurement.state !== 'answered')
+      : null;
+    return target && assayById(store.get(), target.id) ? target : null;
+  }
+
+  function skipIdsFor(step, map) {
+    if (step.id !== 'measurement') return step.skipIds;
+    const measurement = measurementForIntake(map);
+    return measurement ? [`measurement-definition:${measurement.id}`, `assay:${measurement.id}.label`] : [];
+  }
+
+  function firstUnansweredStep(map) {
+    const states = [
+      map.question?.state,
+      map.system?.state,
+      map.comparison?.state,
+      Array.isArray(map.measurements) && map.measurements.some((measurement) => measurement.state === 'answered')
+        ? 'answered'
+        : Array.isArray(map.measurements) && map.measurements.some((measurement) => measurement.state === 'provisional')
+          ? 'provisional'
+          : 'missing',
+      map.experimentalUnit?.state,
+    ];
+    const index = states.findIndex((state) => state === 'missing');
+    return index === -1 ? null : index;
+  }
+
+  function navigateDecision(decision) {
+    if (!decision || !decision.routeId || !router || typeof router.navigate !== 'function') return false;
+    if (decision.measurementId) {
+      // Never derive an array index from a decision. A deleted measurement
+      // makes an old projection harmless: neither patch nor navigation runs.
+      if (!assayById(store.get(), decision.measurementId)) {
+        refresh();
+        return false;
+      }
+      store.patch({ activeAssayId: decision.measurementId });
+    }
+    return router.navigate(decision.routeId);
+  }
+
+  function appendQuestionHeader(host, index) {
+    const progress = doc.createElement('p');
+    progress.className = 'study-map-progress';
+    progress.textContent = `Study map · Question ${index + 1} of ${ORIENTATION_QUESTIONS.length}`;
+    host.appendChild(progress);
+  }
+
+  function appendComparisonControls(host, map) {
+    const fieldset = doc.createElement('fieldset');
+    fieldset.className = 'study-map-comparison';
+    const legend = doc.createElement('legend');
+    legend.textContent = 'Will you compare groups or conditions, or is this an observational study?';
+    fieldset.appendChild(legend);
+    const help = doc.createElement('p');
+    help.className = 'proposals-empty';
+    help.textContent = 'Examples: irrigated and dry plants; amended and unamended soil; coated and uncoated food films; or a descriptive survey of surface roughness.';
+    fieldset.appendChild(help);
+    const currentMode = map.comparison?.mode || 'not-decided';
+    for (const choice of [
+      ['groups', 'Compare groups or conditions'],
+      ['observational', 'Observational study'],
+    ]) {
+      const label = doc.createElement('label');
+      label.className = 'question-answer';
+      const radio = doc.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'study-map-comparison-mode';
+      radio.value = choice[0];
+      radio.checked = currentMode === choice[0];
+      radio.addEventListener('change', () => {
+        write('studyContext.comparisonMode', choice[0]);
+        groups.row.hidden = choice[0] !== 'groups';
+      });
+      label.append(radio, doc.createTextNode(` ${choice[1]}`));
+      fieldset.appendChild(label);
+    }
+    const groups = input(doc, {
+      id: 'study-map-comparison-groups',
+      label: 'Comparison labels',
+      value: Array.isArray(map.comparison?.groups) ? map.comparison.groups.join(', ') : '',
+      placeholder: 'e.g. control, treatment',
+      help: 'For a groups study, add the labels you will compare. Separate labels with commas.',
+      onInput: (value) => write('groupVocabulary', { levels: uniqueLevels(value) }),
+    });
+    groups.row.hidden = currentMode !== 'groups';
+    fieldset.appendChild(groups.row);
+    host.appendChild(fieldset);
+  }
+
+  function appendIntake(host, map, index) {
+    const question = ORIENTATION_QUESTIONS[index];
+    const heading = doc.createElement('h2');
+    heading.className = 'design-subheading';
+    const content = doc.createElement('div');
+    content.className = 'study-map-intake';
+    appendQuestionHeader(content, index);
+
+    if (question.id === 'research-question') {
+      heading.textContent = 'What are you trying to find out?';
+      content.appendChild(heading);
+      const field = input(doc, {
+        id: 'study-map-research-question',
+        label: 'Research question',
+        value: studyMapText(map.question?.value),
+        multiline: true,
+        placeholder: 'e.g. Does drought change tomato root growth?',
+        help: 'Examples: Does compost change soil respiration? Does a coating improve a food package barrier? Does polishing change a surface texture seen by microscopy?',
+        onInput: (value) => write('researchQuestion', value),
+      });
+      content.appendChild(field.row);
+    } else if (question.id === 'system') {
+      heading.textContent = 'What organism, material, sample, surface, or system are you studying?';
+      content.appendChild(heading);
+      const field = input(doc, {
+        id: 'study-map-system',
+        label: 'System or material',
+        value: studyMapText(map.system?.value),
+        placeholder: 'e.g. tomato seedlings in soil',
+        help: 'Examples: tomato seedlings, independently collected soil cores, a cheese-packaging film, or polished glass coupons imaged for surface texture.',
+        onInput: (value) => write('studyContext.system', value),
+      });
+      content.appendChild(field.row);
+    } else if (question.id === 'comparison-mode') {
+      heading.textContent = 'Will you compare groups or conditions, or is this an observational study?';
+      content.appendChild(heading);
+      appendComparisonControls(content, map);
+    } else if (question.id === 'measurement') {
+      heading.textContent = 'What will you measure or observe?';
+      content.appendChild(heading);
+      const measurement = measurementForIntake(map);
+      const assay = measurement && assayById(store.get(), measurement.id);
+      if (assay) {
+        const label = input(doc, {
+          id: 'study-map-measurement-name',
+          label: 'Measurement name',
+          value: studyMapText(assay.label),
+          placeholder: 'e.g. Root architecture',
+          help: 'Use a short name that will make sense in the map and measurement workspace.',
+          onInput: (value) => {
+            const address = scopeWrite(store.get(), 'label', assay.id);
+            write(address.path, value, address.slotKey);
+          },
+        });
+        const readout = input(doc, {
+          id: 'study-map-measurement-observation',
+          label: 'What will you measure or observe?',
+          value: studyMapText(assay.readoutText) || studyMapText(assay.readout),
+          placeholder: 'e.g. root length and branching',
+          help: 'Examples: plant root architecture; CO₂ flux from soil; oxygen permeability of a packaging film; roughness measured from microscope images.',
+          onInput: (value) => {
+            const address = scopeWrite(store.get(), 'readoutText', assay.id);
+            write(address.path, value, address.slotKey);
+          },
+        });
+        content.append(label.row, readout.row);
+      } else {
+        const notice = doc.createElement('p');
+        notice.className = 'proposals-empty';
+        notice.textContent = 'No writable measurement is available. You can continue to the Measurements workspace from the map summary.';
+        content.appendChild(notice);
+      }
+    } else {
+      heading.textContent = 'What counts as one independent experimental unit?';
+      content.appendChild(heading);
+      const field = input(doc, {
+        id: 'study-map-experimental-unit',
+        label: 'Independent experimental unit',
+        value: studyMapText(map.experimentalUnit?.value),
+        placeholder: 'e.g. one independently grown plant',
+        help: 'Examples: one plant grown in its own pot; one independently collected soil core; one separately fabricated film; or one separately prepared microscopy coupon.',
+        onInput: (value) => write('studyContext.experimentalUnit', value),
+      });
+      content.appendChild(field.row);
+    }
+
+    const status = doc.createElement('p');
+    status.className = 'study-map-status';
+    status.setAttribute('aria-live', 'polite');
+    status.textContent = 'Your answers are saved in this study as you type.';
+    content.appendChild(status);
+
+    const actions = doc.createElement('div');
+    actions.className = 'study-map-actions';
+    const back = studyMapButton(doc, 'workflow-back', 'Back', () => {
+      if (index > 0) {
+        intakeStep = index - 1;
+        refresh();
+      }
+    });
+    back.disabled = index === 0;
+    const later = studyMapButton(doc, 'question-answer', 'Decide later', () => {
+      markSkipped(skipIdsFor(question, map));
+      intakeStep = index + 1;
+      refresh();
+    });
+    const continueButton = studyMapButton(doc, 'workflow-continue', 'Continue', () => {
+      intakeStep = index + 1;
+      refresh();
+    });
+    actions.append(back, later, continueButton);
+    content.appendChild(actions);
+    host.appendChild(content);
+  }
+
+  function appendSummaryField(host, config) {
+    const field = input(doc, config);
+    host.appendChild(field.row);
+    return field;
+  }
+
+  function appendSummary(host, map) {
+    const heading = doc.createElement('h2');
+    heading.className = 'design-subheading';
+    heading.textContent = 'Study map';
+    const intro = doc.createElement('p');
+    intro.className = 'proposals-empty';
+    intro.textContent = `${map.orientation?.answered || 0} of ${map.orientation?.total || 5} orientation decisions are answered. Edit any value here; detailed planning remains directly available in every workspace.`;
+    host.append(heading, intro);
+
+    const facts = doc.createElement('div');
+    facts.className = 'study-map-summary';
+    appendSummaryField(facts, {
+      id: 'study-map-summary-question',
+      label: 'Research question',
+      value: studyMapText(map.question?.value),
+      placeholder: 'What are you trying to find out?',
+      onInput: (value) => write('researchQuestion', value),
+    });
+    appendSummaryField(facts, {
+      id: 'study-map-summary-system',
+      label: 'System or material',
+      value: studyMapText(map.system?.value),
+      placeholder: 'Organism, material, sample, surface, or system',
+      onInput: (value) => write('studyContext.system', value),
+    });
+    appendComparisonControls(facts, map);
+    appendSummaryField(facts, {
+      id: 'study-map-summary-unit',
+      label: 'Independent experimental unit',
+      value: studyMapText(map.experimentalUnit?.value),
+      placeholder: 'What is independently assigned or sampled?',
+      onInput: (value) => write('studyContext.experimentalUnit', value),
+    });
+    host.appendChild(facts);
+
+    const measurementHeading = doc.createElement('h3');
+    measurementHeading.className = 'design-subheading';
+    measurementHeading.textContent = 'Measurements';
+    host.appendChild(measurementHeading);
+    const measurements = doc.createElement('div');
+    measurements.className = 'study-map-measurements';
+    const assays = Array.isArray(store.get().assays) ? store.get().assays : [];
+    assays.forEach((assay, index) => {
+      if (!assayById(store.get(), assay.id)) return;
+      const card = doc.createElement('section');
+      card.className = 'study-map-measurement';
+      const title = doc.createElement('h4');
+      title.textContent = `Measurement ${index + 1}`;
+      card.appendChild(title);
+      const labelAddress = scopeWrite(store.get(), 'label', assay.id);
+      const label = input(doc, {
+        id: `study-map-measurement-${assay.id}-name`,
+        label: 'Measurement name',
+        value: studyMapText(assay.label),
+        placeholder: 'Short measurement name',
+        onInput: (value) => write(labelAddress.path, value, labelAddress.slotKey),
+      });
+      const readoutAddress = scopeWrite(store.get(), 'readoutText', assay.id);
+      const readout = input(doc, {
+        id: `study-map-measurement-${assay.id}-readout`,
+        label: 'What will be measured or observed?',
+        value: studyMapText(assay.readoutText) || studyMapText(assay.readout),
+        placeholder: 'Intended observation',
+        onInput: (value) => write(readoutAddress.path, value, readoutAddress.slotKey),
+      });
+      card.append(label.row, readout.row);
+      measurements.appendChild(card);
+    });
+    host.appendChild(measurements);
+
+    const add = doc.createElement('section');
+    add.className = 'study-map-add-measurement';
+    const addHeading = doc.createElement('h4');
+    addHeading.textContent = 'Add another measurement';
+    const addName = input(doc, {
+      id: 'study-map-add-measurement-name',
+      label: 'Measurement name',
+      value: '',
+      placeholder: 'e.g. Surface roughness',
+    });
+    const addReadout = input(doc, {
+      id: 'study-map-add-measurement-readout',
+      label: 'What will be measured or observed?',
+      value: '',
+      placeholder: 'e.g. roughness from microscope images',
+    });
+    const addStatus = doc.createElement('p');
+    addStatus.className = 'study-map-status';
+    addStatus.setAttribute('aria-live', 'polite');
+    const addButton = studyMapButton(doc, 'add-factor-button', 'Add measurement', () => {
+      const label = addName.control.value.trim();
+      const readout = addReadout.control.value.trim();
+      if (!label || !readout) {
+        addStatus.textContent = 'Enter both a measurement name and what it will observe.';
+        return;
+      }
+      const current = store.get();
+      const id = nextUnusedId(current);
+      if (!id) {
+        addStatus.textContent = 'Could not create a unique measurement identifier. Please try again.';
+        return;
+      }
+      const seeded = seedAssayFromVocabulary(current.groupVocabulary, id);
+      const provenance = current.provenance && typeof current.provenance === 'object' ? current.provenance : {};
+      const slots = provenance.slots && typeof provenance.slots === 'object' ? provenance.slots : {};
+      // One patch keeps the new assay and its weak group seed inseparable;
+      // the two facts the user supplied are recorded as STRONG user edits in
+      // that same atomic transition.
+      seeded.assay.label = label;
+      seeded.assay.readoutText = readout;
+      store.patch({
+        assays: [...(Array.isArray(current.assays) ? current.assays : []), seeded.assay],
+        provenance: {
+          ...provenance,
+          slots: {
+            ...slots,
+            [seeded.provenanceSlotKey]: seeded.provenanceEntry,
+            [`assay:${id}.label`]: { tag: 'user', detail: null },
+            [`assay:${id}.readoutText`]: { tag: 'user', detail: null },
+          },
+        },
+      });
+      refresh();
+    });
+    add.append(addHeading, addName.row, addReadout.row, addButton, addStatus);
+    host.appendChild(add);
+
+    if (map.nextDecision) {
+      const next = doc.createElement('section');
+      next.className = 'study-map-next-decision';
+      const nextHeading = doc.createElement('h3');
+      nextHeading.textContent = 'Next decision';
+      const reason = doc.createElement('p');
+      reason.textContent = map.nextDecision.reason || map.nextDecision.label;
+      const nextButton = studyMapButton(doc, 'workflow-continue', map.nextDecision.label, () => navigateDecision(map.nextDecision));
+      next.append(nextHeading, reason, nextButton);
+      host.appendChild(next);
+    }
+  }
+
+  function refresh() {
+    if (destroyed) return;
+    const map = mapForCurrentStudy();
+    const inferred = firstUnansweredStep(map);
+    if (intakeStep === null) intakeStep = inferred;
+    if (intakeStep !== null && intakeStep >= ORIENTATION_QUESTIONS.length) intakeStep = null;
+    element.replaceChildren();
+    if (intakeStep === null) appendSummary(element, map);
+    else appendIntake(element, map, intakeStep);
+  }
+
+  refresh();
+  return {
+    element,
+    refresh,
+    destroy() {
+      destroyed = true;
+      element.replaceChildren();
+    },
+  };
+}
   // ---- src/ui/steps/home.js ----
 // The Home step (zen-planner Phase 1's reframe): the app's landing page and
 // the discoverability point for "start here." It reads only the explicit
@@ -16927,173 +18956,209 @@ function homeGuidedStatus(guidedStatus, getGuidedStatus) {
   return status && typeof status.status === 'string' ? status.status : 'not-started';
 }
 
+function appendGuideLink(main, router) {
+  const row = document.createElement('p');
+  row.className = 'home-skip-row';
+  const link = document.createElement('button');
+  link.type = 'button';
+  link.className = 'home-skip-link';
+  link.textContent = 'Looking for a specific term or step? See the Guide.';
+  link.addEventListener('click', () => {
+    if (router) router.navigate('guide');
+  });
+  row.appendChild(link);
+  main.appendChild(row);
+}
+
+function appendOwnership(main, { title, body, example = false }) {
+  const ownership = document.createElement('section');
+  ownership.className = example ? 'home-study-ownership home-example-ownership' : 'home-study-ownership';
+  const heading = document.createElement('h2');
+  heading.className = 'home-study-ownership-title';
+  heading.textContent = title;
+  const copy = document.createElement('p');
+  copy.className = 'home-study-ownership-body';
+  copy.textContent = body;
+  ownership.append(heading, copy);
+  main.appendChild(ownership);
+  return ownership;
+}
+
+function appendStudyMap(main, store, router) {
+  // This controller owns map input, persistence calls, and deterministic
+  // next-decision routing. Home only chooses when the map is revealed.
+  main.appendChild(createStudyMap({ store, router }).element);
+}
+
+function appendExampleMapSummary(main, store) {
+  const map = buildExperimentMap(store.get());
+  const summary = document.createElement('section');
+  summary.className = 'study-map-editor';
+  summary.setAttribute('aria-label', 'Example study map');
+  const heading = document.createElement('h2');
+  heading.className = 'design-subheading';
+  heading.textContent = 'Example study map';
+  const copy = document.createElement('p');
+  copy.className = 'proposals-empty';
+  copy.textContent = 'Read-only while you explore. Make a copy to edit this study.';
+  const facts = document.createElement('ul');
+  facts.className = 'overview-controls-list';
+  const values = [
+    ['Research question', map.question?.value],
+    ['System or material', map.system?.value],
+    ['Experimental unit', map.experimentalUnit?.value],
+  ];
+  for (const [label, value] of values) {
+    const item = document.createElement('li');
+    item.textContent = `${label}: ${value || 'Not decided'}`;
+    facts.appendChild(item);
+  }
+  const measurements = document.createElement('li');
+  measurements.textContent = `Measurements: ${(map.measurements || []).map((measurement) => measurement.label).join(', ') || 'Not decided'}`;
+  facts.appendChild(measurements);
+  summary.append(heading, copy, facts);
+  main.appendChild(summary);
+}
+
+function appendGuidedEntry(main, options, isExample) {
+  const status = homeGuidedStatus(options.guidedStatus, options.getGuidedStatus);
+  const entry = isExample && status === 'paused'
+    ? { title: 'Resume example walkthrough', body: 'Continue from where you paused; the example stays unchanged.', onClick: options.onResumeGuided }
+    : isExample && status === 'completed'
+      ? { title: 'Restart walkthrough', body: 'Start the optional walkthrough again from Study map.', onClick: options.onRestartGuided }
+      : isExample
+        ? { title: 'Walk through example', body: 'Explore the completed example with optional explanations beside each workspace.', onClick: options.onStartGuided }
+        : { title: 'Explain Study map', body: 'Open contextual guidance without changing your study or guided progress.', onClick: options.onExplainGuided };
+  const grid = document.createElement('div');
+  grid.className = 'home-grid';
+  card(grid, {
+    icon: 'walkthrough',
+    ...entry,
+    onClick: () => {
+      if (typeof entry.onClick === 'function') entry.onClick('home');
+    },
+  });
+  main.appendChild(grid);
+}
+
+function renderExploredExample(main, store, options) {
+  const { router, onAdoptExample } = options;
+  main.textContent = '';
+  const title = document.createElement('h1');
+  title.className = 'step-heading';
+  title.textContent = 'Study map';
+  main.appendChild(title);
+  const ownership = appendOwnership(main, {
+    title: 'Example — changes are not your study',
+    body: 'You are exploring the completed oregano example. Make a copy before treating its four measurements as your own plan.',
+    example: true,
+  });
+  const actions = document.createElement('div');
+  actions.className = 'home-study-ownership-actions';
+  const adopt = document.createElement('button');
+  adopt.type = 'button';
+  adopt.className = 'copy-button';
+  adopt.textContent = 'Make a copy of this example';
+  adopt.title = 'Keep all four example measurements and make this study your own.';
+  adopt.addEventListener('click', () => {
+    const adopted = typeof onAdoptExample === 'function' && onAdoptExample();
+    if (adopted && router) router.navigate('study');
+  });
+  actions.appendChild(adopt);
+  ownership.appendChild(actions);
+  // Exploration is intentionally read-only: the copy action above is the
+  // only way to turn the shipped example into editable user work.
+  appendExampleMapSummary(main, store);
+  appendGuidedEntry(main, options, true);
+  appendGuideLink(main, router);
+}
+
 const homeStep = {
   id: 'home',
-  title: 'Home',
-  render(main, store, {
-    router,
-    onAdoptExample,
-    onNewBlank,
-    guidedStatus,
-    getGuidedStatus,
-    onStartGuided,
-    onResumeGuided,
-    onRestartGuided,
-    onExplainGuided,
-  } = {}) {
+  title: 'Study map',
+  render(main, store, options = {}) {
+    const { router, onNewBlank, exploreExample } = options;
     main.textContent = '';
-
     const heading = document.createElement('h1');
     heading.className = 'step-heading';
-    heading.textContent = 'Plan a microscopy experiment';
+    heading.textContent = 'Study map';
     main.appendChild(heading);
-
     const subheading = document.createElement('p');
     subheading.className = 'proposals-empty';
-    subheading.textContent =
-      'Plan your microscopy study step by step. Describe the research question, groups, samples, imaging setup, and naming rules; Micronaut turns those choices into a checked study plan and ready-to-use file names.';
+    subheading.textContent = 'Start with the shape of your study, then move directly to the workspace that owns each decision.';
     main.appendChild(subheading);
 
-    // This check deliberately reads the explicit origin marker rather than
-    // recognising words from the study text. Older saves with no marker are
-    // conservative user work, never a possibly-mislabelled shipped example.
-    const isExample = store.get().meta?.origin === 'example';
-    const ownership = document.createElement('section');
-    ownership.className = isExample ? 'home-study-ownership home-example-ownership' : 'home-study-ownership';
-    const ownershipTitle = document.createElement('h2');
-    ownershipTitle.className = 'home-study-ownership-title';
-    ownershipTitle.textContent = isExample ? 'Example study · Oregano wound-healing' : 'Your study';
-    ownership.appendChild(ownershipTitle);
-
-    const ownershipBody = document.createElement('p');
-    ownershipBody.className = 'home-study-ownership-body';
-    ownershipBody.textContent = isExample
-      ? 'This is a worked example with four assays. Use it as a template to keep and adapt its structure, or start from an empty study.'
-      : 'This is your workspace. Continue planning, adjust its assays, or use the utilities to back it up and recover earlier versions.';
-    ownership.appendChild(ownershipBody);
-
-    if (isExample) {
-      const actions = document.createElement('div');
-      actions.className = 'home-study-ownership-actions';
-
-      const adoptButton = document.createElement('button');
-      adoptButton.type = 'button';
-      adoptButton.className = 'copy-button';
-      adoptButton.textContent = 'Use as template';
-      adoptButton.title = 'Keep all four example assays and make this study your own.';
-      adoptButton.addEventListener('click', () => {
-        const adopted = typeof onAdoptExample === 'function' && onAdoptExample();
-        if (adopted && router) router.navigate('study');
+    if (store.get().meta?.origin === 'example') {
+      if (exploreExample) {
+        renderExploredExample(main, store, options);
+        return;
+      }
+      // These are the only initial choices for the shipped example. Neither
+      // choice adopts it: blank start is coordinator-owned and exploration is
+      // a local reveal until the separate copy action is chosen.
+      const choices = document.createElement('div');
+      choices.className = 'home-grid';
+      card(choices, {
+        icon: 'study',
+        title: 'Plan my study',
+        body: 'Start with a blank Study map for your own work. The completed example remains available from Utilities.',
+        onClick: () => {
+          if (typeof onNewBlank === 'function') onNewBlank();
+        },
       });
-      actions.appendChild(adoptButton);
-
-      const blankButton = document.createElement('button');
-      blankButton.type = 'button';
-      blankButton.className = 'copy-button';
-      blankButton.textContent = 'Start blank study';
-      blankButton.title = 'Start with one empty assay instead of the oregano example.';
-      blankButton.addEventListener('click', () => {
-        if (typeof onNewBlank === 'function') onNewBlank();
+      card(choices, {
+        icon: 'template',
+        title: 'Explore a completed example',
+        body: 'Inspect the oregano study without making it your study.',
+        onClick: () => renderExploredExample(main, store, options),
       });
-      actions.appendChild(blankButton);
-      ownership.appendChild(actions);
+      main.appendChild(choices);
+      return;
     }
-    main.appendChild(ownership);
 
-    const grid = document.createElement('div');
-    grid.className = 'home-grid';
-    main.appendChild(grid);
-
-    const guideStatus = homeGuidedStatus(guidedStatus, getGuidedStatus);
-    const guidedEntry = isExample && guideStatus === 'paused'
-      ? {
-          title: 'Resume example walkthrough',
-          body: 'Continue from the feature where you paused; the example study stays unchanged.',
-          onClick: onResumeGuided,
-        }
-      : isExample && guideStatus === 'completed'
-        ? {
-            title: 'Restart walkthrough',
-            body: 'Start the optional seven-step example walkthrough again from Home.',
-            onClick: onRestartGuided,
-          }
-        : isExample
-          ? {
-              title: 'Walk through example',
-              body: 'Explore the worked example with an optional explanation beside each of the seven workflow steps.',
-              onClick: onStartGuided,
-            }
-          : {
-              title: 'Explain the workflow',
-              body: 'Open a contextual explanation of this workflow without changing your study or guided progress.',
-              onClick: onExplainGuided,
-            };
-    card(grid, {
-      icon: 'walkthrough',
-      ...guidedEntry,
-      onClick: () => {
-        if (typeof guidedEntry.onClick === 'function') guidedEntry.onClick('home');
-      },
+    appendOwnership(main, {
+      title: 'Plan my study',
+      body: 'This is your workspace. Your map answers are saved here as you plan.',
     });
-
-    card(grid, {
-      icon: 'describe',
-      title: 'Start from a description',
-      body: 'Paste or type a paragraph about your experiment -- the app pulls out what it can and asks about the rest.',
-      onClick: () => {
-        if (router) router.navigate('describe');
-      },
-    });
-
-    card(grid, {
-      icon: 'template',
-      title: isExample ? 'Explore the example' : 'Study design',
-      body: isExample
-        ? 'Open the oregano study to inspect its four assays and see how its design is organised.'
-        : 'Open your study to define its assays, groups, and experimental conditions.',
-      onClick: () => {
-        if (router) router.navigate('study');
-      },
-    });
-
-    const guideRow = document.createElement('p');
-    guideRow.className = 'home-skip-row';
-    const guideLink = document.createElement('button');
-    guideLink.type = 'button';
-    guideLink.className = 'home-skip-link';
-    guideLink.textContent = 'Looking for a specific term or step? See the Guide.';
-    guideLink.addEventListener('click', () => {
-      if (router) router.navigate('guide');
-    });
-    guideRow.appendChild(guideLink);
-    main.appendChild(guideRow);
+    appendStudyMap(main, store, router);
+    appendGuidedEntry(main, options, false);
+    appendGuideLink(main, router);
   },
 };
   // ---- src/ui/steps/onboarding.js ----
 // One-time example disclosure. Main owns every lifecycle decision; this
-// module only records dismissal and reports which of the three equal doors
+// module only records dismissal and reports which of the two first-run choices
 // the visitor chose. Existing stage/experience preferences are deliberately
 // left untouched so older verbosity choices remain readable.
 
 
 const EXAMPLE_CHOICES = [
   {
-    id: 'walkthrough',
-    icon: 'walkthrough',
-    title: 'Walk through example',
-    body: 'Follow the oregano study through the seven workflow steps with a contextual guide.',
+    id: 'blank',
+    icon: 'study',
+    title: 'Plan my study',
+    body: 'Start with your own Study map. The completed oregano example remains available to explore.',
   },
   {
     id: 'explore',
     icon: 'home',
-    title: 'Explore myself',
-    body: 'Keep the example open and use the workspace normally, without guided navigation.',
+    title: 'Explore a completed example',
+    body: 'Open the oregano example to see a completed plan. Changes stay in the example until you make a copy.',
+  },
+];
+
+const RETURNING_CHOICES = [
+  {
+    id: 'walkthrough',
+    icon: 'study',
+    title: 'Take a guided walkthrough',
+    body: 'See the recommended order for shaping a study, then continue from the step that needs attention.',
   },
   {
-    id: 'blank',
-    icon: 'study',
-    title: 'Start blank',
-    body: 'Replace the example with a new empty study. The example remains available from Utilities.',
+    id: 'continue',
+    icon: 'home',
+    title: 'Continue planning',
+    body: 'Close this guide and keep working in the current study. Nothing in your plan will change.',
   },
 ];
 
@@ -17122,13 +19187,13 @@ function onboardingChoiceCard(parent, choice, onChoose) {
 }
 
 /**
- * Show the example-only first-entry chooser.
- *
- * The caller is responsible for proving the current study is the shipped
- * example before invoking this view. Every exit marks onboarding complete;
- * backdrop and Escape deliberately select Explore rather than Start blank.
+ * Show the first-entry chooser or a safe returning-user guide. The latter is
+ * intentionally available from Utilities for every study origin: reopening
+ * onboarding must never silently fail just because the visitor has already
+ * started a real project.
  */
 function showOnboardingGate({
+  isExample = true,
   onWalkThrough,
   onExplore,
   onStartBlank,
@@ -17150,12 +19215,14 @@ function showOnboardingGate({
   const heading = document.createElement('h2');
   heading.id = 'onboarding-choice-title';
   heading.className = 'step-heading';
-  heading.textContent = 'Choose how to begin';
+  heading.textContent = isExample ? 'Choose how to begin' : 'Find your bearings';
 
   const disclosure = document.createElement('p');
   disclosure.id = 'onboarding-choice-disclosure';
   disclosure.className = 'onboarding-choice-disclosure';
-  disclosure.textContent = 'You are looking at an example study: Oregano wound-healing · 4 assays. Nothing here is your data yet.';
+  disclosure.textContent = isExample
+    ? 'You are looking at a completed example: Oregano wound-healing · 4 measurements. It is not your study.'
+    : 'This is your current study. Use the walkthrough for a guided route through the planner, or continue exactly where you left off.';
 
   const choices = document.createElement('div');
   choices.className = 'onboarding-choice-list';
@@ -17172,9 +19239,9 @@ function showOnboardingGate({
     saveOnboarding({ completed: true });
     teardown();
 
-    if (choice === 'walkthrough' && typeof onWalkThrough === 'function') onWalkThrough();
-    else if (choice === 'blank' && typeof onStartBlank === 'function') onStartBlank();
-    else if (typeof onExplore === 'function') onExplore();
+    if (choice === 'blank' && typeof onStartBlank === 'function') onStartBlank();
+    else if (choice === 'explore' && typeof onExplore === 'function') onExplore();
+    else if (choice === 'walkthrough' && typeof onWalkThrough === 'function') onWalkThrough();
 
     if (typeof onDone === 'function') onDone(choice);
   }
@@ -17182,11 +19249,12 @@ function showOnboardingGate({
   function onKeydown(event) {
     if (event.key !== 'Escape') return;
     event.preventDefault();
-    complete('explore');
+    complete(isExample ? 'explore' : 'continue');
   }
 
-  EXAMPLE_CHOICES.forEach((choice) => onboardingChoiceCard(choices, choice, complete));
-  backdrop.addEventListener('click', () => complete('explore'));
+  (isExample ? EXAMPLE_CHOICES : RETURNING_CHOICES)
+    .forEach((choice) => onboardingChoiceCard(choices, choice, complete));
+  backdrop.addEventListener('click', () => complete(isExample ? 'explore' : 'continue'));
   window.addEventListener('keydown', onKeydown);
 
   dialog.append(heading, disclosure, choices);
@@ -17196,7 +19264,7 @@ function showOnboardingGate({
   if (firstChoice && typeof firstChoice.focus === 'function') firstChoice.focus();
 
   return {
-    close() { complete('explore'); },
+    close() { complete(isExample ? 'explore' : 'continue'); },
   };
 }
   // ---- src/ui/steps/overview.js ----
@@ -17238,7 +19306,7 @@ function buildDiagramSvg(layout) {
   svg.setAttribute('height', String(layout.height));
   svg.setAttribute('class', 'study-map-svg');
   svg.setAttribute('role', 'img');
-  svg.setAttribute('aria-label', 'Study map: the study branching to each assay and its readout, modality, design, controls, and planned filenames.');
+  svg.setAttribute('aria-label', 'Study map: the study branching to each measurement and its readout, modality, design, controls, and planned filenames.');
 
   // One arrowhead marker, referenced by every edge.
   const defs = document.createElementNS(SVG_NS, 'defs');
@@ -17328,14 +19396,137 @@ function appendLabeledNode(parent, className, text) {
   return node;
 }
 
-const ISSUE_ROUTES = {
-  design: 'design',
-  naming: 'naming',
-  incomplete: 'naming',
-  path: 'naming',
-  panel: 'panel',
-  'cross-assay': 'naming',
-};
+const REVIEW_DECISION_GROUP_HEADINGS = Object.freeze({
+  'study-shape': 'Study-shape decisions',
+  'measurement-design': 'Measurement-design decisions',
+  'before-acquisition': 'Before acquisition',
+  later: 'Can be assigned later',
+});
+
+// The fixed execution ladder comes from a specialist-authored KB whose
+// historic prose says "assay".  Review is a presentation surface, so adapt
+// that one visible term here without rewriting the KB, document shape, or
+// persisted `assays` contract.
+function reviewLadderText(value) {
+  return typeof value === 'string' ? value.replace(/\bassay\b/gi, 'measurement') : '';
+}
+
+function reviewMeasurementLabel(label, index) {
+  const text = typeof label === 'string' ? label.trim() : '';
+  const generated = text.match(/^assay\s+(\d+)$/i);
+  if (generated) return `Measurement ${generated[1]}`;
+  return text || `Measurement ${index}`;
+}
+
+function reviewMapValue(value, fallback = 'Not decided') {
+  return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+}
+
+function reviewComparisonSummary(comparison) {
+  if (comparison?.mode === 'observational') return 'Observational study';
+  if (comparison?.mode === 'groups') {
+    const groups = Array.isArray(comparison.groups) ? comparison.groups.filter(Boolean) : [];
+    return groups.length > 0 ? `Groups: ${groups.join(', ')}` : 'Groups not decided';
+  }
+  return 'Not decided';
+}
+
+function reviewDecisionMeasurementId(decision) {
+  const candidate = decision?.measurementId ?? decision?.assayId;
+  return typeof candidate === 'string' && candidate ? candidate : null;
+}
+
+// The review is a map consumer, not a second map editor or priority engine.
+// This intentionally displays values from buildExperimentMap() verbatim and
+// makes no state writes while rendering the shared study shape.
+function renderReviewExperimentMapSummary(parent, map) {
+  const section = document.createElement('section');
+  section.className = 'study-map';
+  const heading = document.createElement('h2');
+  heading.className = 'overview-node-title';
+  heading.textContent = 'Study map';
+  section.appendChild(heading);
+
+  appendLabeledNode(section, 'overview-node', `Research question: ${reviewMapValue(map.question?.value)}`);
+  appendLabeledNode(section, 'overview-node', `System or material: ${reviewMapValue(map.system?.value)}`);
+  appendLabeledNode(section, 'overview-node', `Comparison: ${reviewComparisonSummary(map.comparison)}`);
+  appendLabeledNode(section, 'overview-node', `Experimental unit: ${reviewMapValue(map.experimentalUnit?.value)}`);
+
+  const measurements = Array.isArray(map.measurements) ? map.measurements : [];
+  const list = document.createElement('ul');
+  list.className = 'overview-controls-list';
+  for (const [index, measurement] of measurements.entries()) {
+    const item = document.createElement('li');
+    const label = reviewMeasurementLabel(measurement?.label, index + 1);
+    const readout = reviewMapValue(measurement?.readout, 'Not decided');
+    item.textContent = `${label}: ${readout}`;
+    list.appendChild(item);
+  }
+  if (measurements.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'panel-empty';
+    empty.textContent = 'No measurements are defined yet.';
+    section.appendChild(empty);
+  } else {
+    section.appendChild(list);
+  }
+  parent.appendChild(section);
+}
+
+function reviewDecisionText(item) {
+  if (item?.source === 'map') {
+    const label = reviewMapValue(item.label, 'Review this decision');
+    const reason = reviewMapValue(item.reason, 'Needs review.');
+    return `${label} — ${reason}`;
+  }
+  return issueText(item);
+}
+
+function renderReviewDecisionGroups(parent, triage, navigateDecision) {
+  const section = document.createElement('section');
+  section.className = 'conformance';
+  const heading = document.createElement('h2');
+  heading.className = 'overview-node-title';
+  heading.textContent = 'Decisions';
+  section.appendChild(heading);
+
+  for (const group of triage.groups) {
+    const groupHeading = document.createElement('h3');
+    groupHeading.className = 'overview-node-title';
+    groupHeading.textContent = REVIEW_DECISION_GROUP_HEADINGS[group.tier];
+    section.appendChild(groupHeading);
+
+    if (group.items.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'panel-empty';
+      empty.textContent = 'No decisions in this group.';
+      section.appendChild(empty);
+      continue;
+    }
+
+    const list = document.createElement('ul');
+    list.className = 'issues-list';
+    for (const item of group.items) {
+      const li = document.createElement('li');
+      li.className = 'issue issue-' + (item.severity || 'warning');
+      const text = reviewDecisionText(item);
+      if (item.routeId && typeof navigateDecision === 'function') {
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.className = 'conformance-issue-link';
+        link.textContent = text;
+        link.title = `Go to the workspace that owns this decision.`;
+        link.addEventListener('click', () => navigateDecision(item));
+        li.appendChild(link);
+      } else {
+        li.textContent = text;
+      }
+      list.appendChild(li);
+    }
+    section.appendChild(list);
+  }
+  parent.appendChild(section);
+}
 
 const FIELD_LABELS = {
   date: 'Acquisition date',
@@ -17363,10 +19554,10 @@ function issueText(issue) {
 }
 
 function reportIssues(report) {
-  const assayIssues = (report.assays || []).flatMap((assay) =>
-    (assay.issues || []).map((issue) => ({ ...issue, assayLabel: assay.label }))
+  const assayIssues = (report.assays || []).flatMap((assay, index) =>
+    (assay.issues || []).map((issue) => ({ ...issue, assayLabel: reviewMeasurementLabel(assay.label, index + 1) }))
   );
-  const crossAssay = (report.crossAssayIssues || []).map((issue) => ({ ...issue, assayLabel: 'Across assays' }));
+  const crossAssay = (report.crossAssayIssues || []).map((issue) => ({ ...issue, assayLabel: 'Across measurements' }));
   return [...assayIssues, ...crossAssay];
 }
 
@@ -17448,7 +19639,7 @@ function renderLadderNode(parent, ladder) {
 
   const heading = document.createElement('div');
   heading.className = 'overview-node-title';
-  heading.textContent = 'How to run this project';
+  heading.textContent = 'How to run this study';
   box.appendChild(heading);
 
   const ol = document.createElement('ol');
@@ -17457,12 +19648,12 @@ function renderLadderNode(parent, ladder) {
     const li = document.createElement('li');
     const title = document.createElement('div');
     title.className = 'overview-ladder-title';
-    title.textContent = stage.title;
+    title.textContent = reviewLadderText(stage.title);
     li.appendChild(title);
 
     const body = document.createElement('p');
     body.className = 'overview-ladder-body';
-    body.textContent = stage.body;
+    body.textContent = reviewLadderText(stage.body);
     li.appendChild(body);
 
     ol.appendChild(li);
@@ -17479,7 +19670,7 @@ function renderStageNotesNode(parent, stageNotes) {
 
   const heading = document.createElement('div');
   heading.className = 'overview-node-title';
-  heading.textContent = 'Notes for this assay';
+  heading.textContent = 'Notes for this measurement';
   box.appendChild(heading);
 
   for (const stage of stageNotes) {
@@ -17503,10 +19694,11 @@ function renderStageNotesNode(parent, stageNotes) {
 function renderAssayNode(parent, assay, onDownloadBenchCard) {
   const box = document.createElement('details');
   box.className = 'overview-assay';
+  const label = reviewMeasurementLabel(assay.label, assay.index);
 
   const summary = document.createElement('summary');
   summary.className = 'overview-assay-summary';
-  summary.textContent = `Assay ${assay.index}: ${assay.label} · ${assay.filenames.length} planned filename${assay.filenames.length === 1 ? '' : 's'}`;
+  summary.textContent = `Measurement ${assay.index}: ${label} · ${assay.filenames.length} planned filename${assay.filenames.length === 1 ? '' : 's'}`;
   box.appendChild(summary);
 
   const headerRow = document.createElement('div');
@@ -17514,7 +19706,7 @@ function renderAssayNode(parent, assay, onDownloadBenchCard) {
 
   const heading = document.createElement('div');
   heading.className = 'overview-assay-title';
-  heading.textContent = `Assay ${assay.index}: ${assay.label}`;
+  heading.textContent = `Measurement ${assay.index}: ${label}`;
   headerRow.appendChild(heading);
 
   // Per-assay, not a single study-wide button -- a bench card is a
@@ -17562,7 +19754,7 @@ function renderAssayNode(parent, assay, onDownloadBenchCard) {
   if (assay.filenames.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'planned-empty';
-    empty.textContent = 'No names to show -- see the issues in the Design step.';
+    empty.textContent = 'No names to show -- see the issues in Samples & design.';
     filesList.appendChild(empty);
   }
   for (const entry of assay.filenames) {
@@ -17579,23 +19771,37 @@ function renderAssayNode(parent, assay, onDownloadBenchCard) {
 function createOverviewStep(kb) {
   return {
     id: 'overview',
-    title: 'Overview',
+    title: 'Review',
     render(main, store, { showToast, router } = {}) {
       main.textContent = '';
 
       const heading = document.createElement('h1');
       heading.className = 'step-heading';
-      heading.textContent = 'Study overview';
+      heading.textContent = 'Review';
       main.appendChild(heading);
 
       const explainer = document.createElement('p');
       explainer.className = 'proposals-empty';
       explainer.textContent =
-        'A deterministic summary of this study, built entirely from what you’ve entered on the other steps -- nothing here is LLM-generated.';
+        'A deterministic review of this study, built entirely from what you’ve entered on the other steps -- nothing here is LLM-generated.';
       main.appendChild(explainer);
 
       const doc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
       const conformance = checkConformance(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
+      const experimentMap = buildExperimentMap(store.get(), { conformance });
+      const triage = decisionTriage(experimentMap, conformance);
+
+      function navigateDecision(decision) {
+        if (!decision || !decision.routeId || !router || typeof router.navigate !== 'function') return false;
+        const measurementId = reviewDecisionMeasurementId(decision);
+        if (measurementId) {
+          // Decisions contain stable measurement ids, never array indices. A
+          // deleted measurement makes an older Review projection inert.
+          if (!assayById(store.get(), measurementId)) return false;
+          store.patch({ activeAssayId: measurementId });
+        }
+        return router.navigate(decision.routeId);
+      }
 
       // Every final artifact checks the current store at click time. This
       // avoids exporting stale closure data after a user has changed a field
@@ -17692,14 +19898,20 @@ function createOverviewStep(kb) {
       });
       secondaryActions.appendChild(printBtn);
 
-      // The study map: the headline visual of this step, placed first. A
+      // The orientation map and the consequence groups are intentionally
+      // first: map ordering and tier assignment come from their pure owners,
+      // not from this Review surface.
+      renderReviewExperimentMapSummary(main, experimentMap);
+      renderReviewDecisionGroups(main, triage, navigateDecision);
+
+      // The study diagram: retained alongside the textual Study-map summary.
       // horizontal scroll container keeps a wide (many-assay) map from forcing
       // the whole page to scroll sideways.
       const mapSection = document.createElement('section');
       mapSection.className = 'study-map';
       const mapHeading = document.createElement('h2');
       mapHeading.className = 'overview-node-title';
-      mapHeading.textContent = 'Study map';
+      mapHeading.textContent = 'Study diagram';
       mapSection.appendChild(mapHeading);
       const mapScroll = document.createElement('div');
       mapScroll.className = 'study-map-scroll';
@@ -17720,17 +19932,22 @@ function createOverviewStep(kb) {
 
       const conformanceHeading = document.createElement('h2');
       conformanceHeading.className = 'overview-node-title';
-      conformanceHeading.textContent = 'Conformance check';
+      conformanceHeading.textContent = 'Planner checks';
       conformanceSection.appendChild(conformanceHeading);
 
       const verdict = document.createElement('div');
       verdict.className = `conformance-verdict conformance-${conformance.readiness}`;
       verdict.textContent = conformance.readiness === 'ready'
-        ? `Ready to acquire/export across ${conformance.assays.length} assay(s).`
+        ? 'All planner checks complete'
         : conformance.readiness === 'blocked'
           ? `Blocked: ${conformance.counts.blocked} issue(s) need correction before final export.`
           : `Needs review: ${conformance.counts.needsReview} incomplete or provisional item(s) remain.`;
       conformanceSection.appendChild(verdict);
+
+      const disclaimer = document.createElement('p');
+      disclaimer.className = 'panel-empty';
+      disclaimer.textContent = 'Planner checks do not validate scientific validity, statistical power, ethics approval, biosafety, or instrument suitability.';
+      conformanceSection.appendChild(disclaimer);
 
       const allConformanceIssues = reportIssues(conformance);
       if (allConformanceIssues.length === 0) {
@@ -17738,28 +19955,6 @@ function createOverviewStep(kb) {
         clean.className = 'panel-empty';
         clean.textContent = 'No issues found at all -- every check this app runs came back clean.';
         conformanceSection.appendChild(clean);
-      } else {
-        const list = document.createElement('ul');
-        list.className = 'issues-list';
-        for (const issue of allConformanceIssues) {
-          const li = document.createElement('li');
-          li.className = 'issue issue-' + issue.severity;
-          const text = `${issue.assayLabel} · ${issueText(issue)}`;
-          const route = ISSUE_ROUTES[issue.section];
-          if (route && router) {
-            const link = document.createElement('button');
-            link.type = 'button';
-            link.className = 'conformance-issue-link';
-            link.textContent = text;
-            link.title = `Go to ${route === 'panel' ? 'Microscopy' : route === 'design' ? 'Design' : 'Naming'} to review this item`;
-            link.addEventListener('click', () => router.navigate(route));
-            li.appendChild(link);
-          } else {
-            li.textContent = text;
-          }
-          list.appendChild(li);
-        }
-        conformanceSection.appendChild(list);
       }
       main.appendChild(conformanceSection);
       main.append(exportMenu, secondaryActions);
@@ -18487,7 +20682,7 @@ const STATE_LABELS = {
 function stateSentence(entry) {
   switch (entry.state) {
     case 'unrecognized':
-      return `"${entry.token}" isn't a marker this app recognizes yet -- check the spelling on the Naming step.`;
+      return `"${entry.token}" isn't a marker this app recognizes yet -- check the spelling on the Data plan step.`;
     case 'ambiguous-family':
       return `"${entry.token}" names a multi-color family -- specify which variant (e.g. "${entry.token} Red") to check it for spillover.`;
     case 'no-intrinsic-spectrum':
@@ -18544,7 +20739,7 @@ function summaryText(channels) {
   return (
     `${channels.length} channel(s), ${filled} with a fluorophore named -- ` +
     (antibodyCount > 0
-      ? `${antibodyCount} use an antibody (isotype/secondary-antibody controls will be recommended on Overview).`
+      ? `${antibodyCount} use an antibody (isotype/secondary-antibody controls will be recommended on Review).`
       : 'none use an antibody.') +
     ` ${filterCount} detection filter(s) entered.`
   );
@@ -18564,6 +20759,13 @@ function createMicroscopySection(title, initiallyOpen = false) {
   return details;
 }
 
+function activeMeasurementLabel(experiment, assayId) {
+  const assays = experiment && Array.isArray(experiment.assays) ? experiment.assays : [];
+  const index = assays.findIndex((assay) => assay && assay.id === assayId);
+  const assay = index === -1 ? null : assays[index];
+  return assay?.label || (index === -1 ? 'Active measurement' : `Measurement ${index + 1}`);
+}
+
 // Same question-bank load as ui/steps/describe.js's module-level constant --
 // one parse of web/kb/questions.json, shared by both step factories via the
 // same `kb` object main.js already passes each of them. See loadQuestions'
@@ -18576,11 +20778,11 @@ function createPanelStep(kb) {
   const fluorophoreOptions = panelFluorophoreOptions(kb.spectra);
   return {
     id: 'panel',
-    // Retitled 'Microscopy' (zen-planner Phase 1's reframe): this is where
+    // Retitled 'Acquisition': this is where
     // acquisition specifics -- modality, instrument, magnification, markers
     // -- get decided, after Project and before Outputs. The id stays
     // 'panel' (URL hash, every render() call site) -- label only.
-    title: 'Microscopy',
+    title: 'Acquisition',
     render(main, store, { advisor, experience } = {}) {
       // Commit 1 of the assay tier idiom (naming.js/design.js/describe.js
       // all cache this identically): the active assay never changes for the
@@ -18600,8 +20802,13 @@ function createPanelStep(kb) {
 
         const heading = document.createElement('h1');
         heading.className = 'step-heading';
-        heading.textContent = 'Microscopy';
+        heading.textContent = 'Acquisition';
         main.appendChild(heading);
+
+        const scope = document.createElement('p');
+        scope.className = 'proposals-empty';
+        scope.textContent = `Planning how data will be acquired for: ${activeMeasurementLabel(store.get(), assayId)}.`;
+        main.appendChild(scope);
 
         const acquisitionSection = createMicroscopySection('Acquisition', true);
         const fluorophoresSection = createMicroscopySection('Fluorophores and spillover');
@@ -18635,7 +20842,7 @@ function createPanelStep(kb) {
       const explainer = document.createElement('p');
       explainer.className = 'proposals-empty';
       explainer.textContent =
-        'A qualitative check for spectral spillover across this assay’s fluorophores -- excitation/emission peak proximity only, not a spectral-overlap integral.';
+        'A qualitative check for spectral spillover across this measurement’s fluorophores -- excitation/emission peak proximity only, not a spectral-overlap integral.';
       fluorophoresSection.appendChild(explainer);
 
       const banner = document.createElement('div');
@@ -18653,7 +20860,7 @@ function createPanelStep(kb) {
       if (panelState === 'unanswered') {
         const empty = document.createElement('p');
         empty.className = 'panel-empty';
-        empty.textContent = 'No markers entered yet -- fill in the markers field on the Naming step to see a color panel here.';
+        empty.textContent = 'No markers entered yet -- fill in the markers field on the Data plan step to see a color panel here.';
         fluorophoresSection.appendChild(empty);
       } else if (panelState === 'no-markers-declared') {
         // A DECLARATION ("NONE", "N/A", "unstained", ...), not a typo -- see
@@ -18662,7 +20869,7 @@ function createPanelStep(kb) {
         // answer was "there are no fluorophores in this assay."
         const declared = document.createElement('p');
         declared.className = 'panel-empty';
-        declared.textContent = 'This assay declares no markers/fluorophores -- nothing for a color panel to check here.';
+        declared.textContent = 'This measurement declares no markers/fluorophores -- nothing for a color panel to check here.';
         fluorophoresSection.appendChild(declared);
       } else {
         const list = document.createElement('div');
@@ -18714,8 +20921,8 @@ function createPanelStep(kb) {
       const assemblyExplainer = document.createElement('p');
       assemblyExplainer.className = 'panel-empty';
       assemblyExplainer.textContent =
-        'Optional: name each channel’s biological target and how its fluorophore is attached. More precise than the ' +
-        'markers field above -- in particular, it is what tells the Overview step’s controls whether an antibody is ' +
+        'Optional: name each channel’s target or feature and how its fluorophore is attached. More precise than the ' +
+        'markers field above -- in particular, it is what tells the Review step’s controls whether an antibody is ' +
         'actually involved, so it can recommend an isotype control only when one is warranted. Enter a detection ' +
         'filter as center/bandwidth nm to overlay it above. Drag channel handles or use the arrow buttons to reorder; ' +
         'ordering changes the saved channel list, never a fluorophore’s physical wavelength.';
@@ -19149,7 +21356,7 @@ function createPanelStep(kb) {
   };
 }
   // ---- src/ui/steps/study.js ----
-// The Study step: the one study-level surface, sitting above every assay.
+// The Measurements step: the one study-level surface, sitting above every assay.
 // First in main.js's steps array -- the landing page, and the
 // discoverability surface for "this app can model more than one assay,"
 // per docs/plans/planner-web-assay-tier.md's commit-2 sequencing.
@@ -19189,7 +21396,7 @@ function groupDivergenceSummary(experiment) {
   }).length;
 
   const total = assays.length;
-  return `${matching} of ${total} assay${total === 1 ? '' : 's'} use this group vocabulary.`;
+  return `${matching} of ${total} measurement${total === 1 ? '' : 's'} reuse these comparison labels.`;
 }
 
 function studyGroupTokens(value) {
@@ -19226,15 +21433,60 @@ function studyAssayBaseName(store, assayId) {
   return renderName(finalized, { ...NAMING_CONFIG, template: BASE_TEMPLATE });
 }
 
+function measurementReadout(assay) {
+  const value = assay && (assay.readoutText || assay.readout);
+  return value || 'Intended observation not yet described.';
+}
+
+function measurementSystemSummary(experiment, assay) {
+  const specimen = assay && assay.specimen && typeof assay.specimen === 'object' ? assay.specimen : {};
+  const system =
+    experiment && experiment.studyContext && typeof experiment.studyContext.system === 'string'
+      ? experiment.studyContext.system.trim()
+      : '';
+  const values = [system, specimen.organism, specimen.sampleType, specimen.preparation]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean);
+  const seen = new Set();
+  const unique = values.filter((value) => {
+    const key = value.toLocaleLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return unique.join(' · ');
+}
+
+function progressStateLabel(state) {
+  const labels = {
+    'not-started': 'Not started',
+    'in-progress': 'In progress',
+    'needs-attention': 'Decision needed',
+    complete: 'Ready for now',
+  };
+  return labels[state] || '';
+}
+
+function measurementPlanningState(workflowProgress, assayId) {
+  const assays = workflowProgress && Array.isArray(workflowProgress.assays) ? workflowProgress.assays : [];
+  const progress = assays.find((assay) => assay && assay.id === assayId);
+  if (!progress || !progress.steps) return '';
+
+  const design = progressStateLabel(progress.steps.design && progress.steps.design.state);
+  const acquisition = progressStateLabel(progress.steps.microscopy && progress.steps.microscopy.state);
+  if (!design && !acquisition) return '';
+  return `Samples & design: ${design || 'Not started'} · Acquisition: ${acquisition || 'Not started'}`;
+}
+
 const studyStep = {
   id: 'study',
-  title: 'Study',
-  render(main, store, { showToast, router } = {}) {
+  title: 'Measurements',
+  render(main, store, { showToast, router, workflowProgress } = {}) {
     main.textContent = '';
 
     const heading = document.createElement('h1');
     heading.className = 'step-heading';
-    heading.textContent = 'Study';
+    heading.textContent = 'Measurements';
     main.appendChild(heading);
 
     // --- Research question -------------------------------------------
@@ -19248,7 +21500,7 @@ const studyStep = {
     rqInput.type = 'text';
     rqInput.className = 'field-input';
     rqInput.placeholder = 'e.g. Does an oregano-plasma coating reduce bacterial load on wound dressings?';
-    rqInput.title = 'What the whole study is trying to answer -- every assay below exists in service of this one question.';
+    rqInput.title = 'What the whole study is trying to answer -- every measurement below exists in service of this one question.';
     rqInput.value = store.get().researchQuestion || '';
     rqInput.addEventListener('input', () => {
       // Study-level, unscoped -- same one-liner pattern describe.js already
@@ -19259,18 +21511,24 @@ const studyStep = {
     rqRow.appendChild(rqInput);
     main.appendChild(rqRow);
 
-    // --- Group vocabulary -------------------------------------------------
+    // --- Shared comparison labels -----------------------------------------
     const vocabHeading = document.createElement('div');
     vocabHeading.className = 'design-subheading';
-    vocabHeading.textContent = 'Group vocabulary';
+    vocabHeading.textContent = 'Comparison labels';
     main.appendChild(vocabHeading);
+
+    const vocabHelp = document.createElement('p');
+    vocabHelp.className = 'proposals-empty';
+    vocabHelp.textContent =
+      'Reuse these labels when measurements compare groups or conditions. Observational studies may have no comparison labels.';
+    main.appendChild(vocabHelp);
 
     const vocabRow = document.createElement('div');
     vocabRow.className = 'field-row';
     const vocabLabel = document.createElement('span');
     vocabLabel.className = 'field-label';
     vocabLabel.id = 'study-group-vocabulary-label';
-    vocabLabel.textContent = 'Default groups for new assays';
+    vocabLabel.textContent = 'Labels to reuse for comparisons';
     vocabRow.appendChild(vocabLabel);
     const tokenField = document.createElement('div');
     tokenField.className = 'study-group-token-field';
@@ -19283,10 +21541,10 @@ const studyStep = {
     const vocabInput = document.createElement('input');
     vocabInput.type = 'text';
     vocabInput.className = 'study-group-token-input';
-    vocabInput.placeholder = 'Type a group, then press Enter';
-    vocabInput.setAttribute('aria-label', 'Add a group');
+    vocabInput.placeholder = 'Type a comparison label, then press Enter';
+    vocabInput.setAttribute('aria-label', 'Add a comparison label');
     vocabInput.title =
-      'A TEMPLATE, not a shared axis -- each assay gets its own copy when created, and can diverge from it freely. Used to seed new assays and by "Apply to all assays" below.';
+      'A reusable seed, not a shared live axis -- each measurement keeps its own copy and can diverge freely. Used to seed new measurements and by "Apply to all measurements" below.';
     tokenField.appendChild(vocabInput);
 
     function vocabularyLevels() {
@@ -19313,7 +21571,7 @@ const studyStep = {
         remove.type = 'button';
         remove.className = 'study-group-token-remove';
         remove.textContent = '×';
-        remove.setAttribute('aria-label', `Remove group ${group}`);
+        remove.setAttribute('aria-label', `Remove comparison label ${group}`);
         remove.addEventListener('pointerdown', (event) => {
           // Keep pointer removal from blurring and committing the adjacent
           // input before this same control receives its click.
@@ -19373,9 +21631,9 @@ const studyStep = {
     const applyBtn = document.createElement('button');
     applyBtn.type = 'button';
     applyBtn.className = 'add-factor-button';
-    applyBtn.textContent = 'Apply to all assays';
+    applyBtn.textContent = 'Apply to all measurements';
     applyBtn.title =
-      "Fills in this vocabulary's groups for every assay that hasn't customized its own -- an assay whose groups you already edited by hand is left alone.";
+      "Seeds these comparison labels into every measurement that has not customized its own groups -- a measurement whose groups you already edited by hand is left alone.";
     applyBtn.addEventListener('click', () => {
       const experiment = store.get();
       const levels = (experiment.groupVocabulary && experiment.groupVocabulary.levels) || [];
@@ -19395,8 +21653,8 @@ const studyStep = {
       if (showToast) {
         showToast(
           skipped > 0
-            ? `Applied to ${applied} assay(s); skipped ${skipped} that already have custom groups.`
-            : `Applied to ${applied} assay(s).`
+            ? `Applied to ${applied} measurement(s); skipped ${skipped} that already have custom groups.`
+            : `Applied to ${applied} measurement(s).`
         );
       }
       renderAssayList();
@@ -19404,10 +21662,10 @@ const studyStep = {
     });
     main.appendChild(applyBtn);
 
-    // --- Per-assay list ---------------------------------------------------
+    // --- Per-measurement list ---------------------------------------------
     const listHeading = document.createElement('div');
     listHeading.className = 'design-subheading';
-    listHeading.textContent = 'Assays';
+    listHeading.textContent = 'Measurements';
     main.appendChild(listHeading);
 
     const assayList = document.createElement('div');
@@ -19426,8 +21684,8 @@ const studyStep = {
         const labelInput = document.createElement('input');
         labelInput.type = 'text';
         labelInput.className = 'field-input';
-        labelInput.placeholder = `Assay ${index + 1}`;
-        labelInput.title = 'A short name for this assay, e.g. "Bacterial viability" -- shown in the switcher above.';
+        labelInput.placeholder = `Measurement ${index + 1}`;
+        labelInput.title = 'A short name for this measurement, e.g. "Bacterial viability" -- shown in the switcher above.';
         labelInput.value = assay.label || '';
         labelInput.addEventListener('input', () => {
           const { path, slotKey } = scopeWrite(store.get(), 'label', assay.id);
@@ -19441,6 +21699,28 @@ const studyStep = {
           renderIssues();
         });
         row.appendChild(labelInput);
+
+        const details = document.createElement('div');
+        details.className = 'study-assay-details';
+        const readout = document.createElement('p');
+        readout.className = 'study-assay-readout';
+        readout.textContent = `Readout / intended observation: ${measurementReadout(assay)}`;
+        details.appendChild(readout);
+        const systemSummary = measurementSystemSummary(experiment, assay);
+        if (systemSummary) {
+          const system = document.createElement('p');
+          system.className = 'study-assay-system';
+          system.textContent = `System or specimen: ${systemSummary}`;
+          details.appendChild(system);
+        }
+        const planningState = measurementPlanningState(workflowProgress, assay.id);
+        if (planningState) {
+          const progress = document.createElement('p');
+          progress.className = 'study-assay-progress';
+          progress.textContent = planningState;
+          details.appendChild(progress);
+        }
+        row.appendChild(details);
 
         const baseNameEl = document.createElement('code');
         baseNameEl.className = 'base-name-value study-assay-basename';
@@ -19459,7 +21739,7 @@ const studyStep = {
         const gotoBtn = document.createElement('button');
         gotoBtn.type = 'button';
         gotoBtn.className = 'question-answer';
-        gotoBtn.textContent = 'Go to Design';
+        gotoBtn.textContent = 'Continue planning this measurement';
         gotoBtn.addEventListener('click', () => {
           store.patch({ activeAssayId: assay.id });
           if (router) router.navigate('design');
@@ -19473,7 +21753,7 @@ const studyStep = {
           removeBtn.textContent = 'Delete';
           removeBtn.addEventListener('click', () => {
             const ok = window.confirm(
-              `Delete "${assay.label || `Assay ${index + 1}`}" and all its design, panel, and naming data?\n\nThis cannot be undone.`
+              `Delete "${assay.label || `Measurement ${index + 1}`}" and all its design, panel, and naming data?\n\nThis cannot be undone.`
             );
             if (!ok) return;
             const result = removeAssay(store.get(), assay.id);
@@ -19496,8 +21776,8 @@ const studyStep = {
     const assayCount = Array.isArray(store.get().assays) ? store.get().assays.length : 0;
     addAssayHint.textContent =
       assayCount >= MAX_STUDY_ROWS
-        ? `This study has reached the ${MAX_STUDY_ROWS}-assay cap.`
-        : 'Use "+ Add assay" in the bar above to add another assay to this study.';
+        ? `This study has reached the ${MAX_STUDY_ROWS}-measurement cap.`
+        : 'Use "+ Add measurement" in the bar above to add another measurement to this study.';
     main.appendChild(addAssayHint);
 
     // --- Cross-assay collision check --------------------------------------
@@ -19516,6 +21796,7 @@ const studyStep = {
       for (const issue of issues) {
         const li = document.createElement('li');
         li.className = 'issue issue-' + issue.severity;
+        // studyNameIssues remains the sole collision validator.
         li.textContent = `${issue.field}: ${issue.message}`;
         issuesList.appendChild(li);
       }
@@ -20050,11 +22331,13 @@ function init() {
   }
 
   function resetToExample() {
+    exploreExample = false;
     store.replace(createDefaultStudy());
     showToast('Restored the oregano example. Your previous versions remain available in Restore.');
   }
 
   function startBlankStudy() {
+    exploreExample = false;
     store.replace(emptyExperiment());
     showToast('Started a blank study. Your previous versions remain available in Restore.');
   }
@@ -20102,15 +22385,23 @@ function init() {
 
   let exampleChooser = null;
   let guidedController = null;
+  let exploreExample = false;
 
   function showExampleChooser({ explicit = false } = {}) {
-    if (exampleChooser || loadOnboarding().completed || store.get().meta?.origin !== 'example') return false;
+    const isExample = store.get().meta?.origin === 'example';
+    if (exampleChooser || loadOnboarding().completed) return false;
     // A recovered autosave is returning work even if it began from the seed.
-    // Only an explicit utility request may reopen the chooser in that case.
-    if (!explicit && isPersisted) return false;
+    // Only an explicit utility request may reopen a guide for returning work.
+    if (!explicit && (!isExample || isPersisted)) return false;
     exampleChooser = showOnboardingGate({
+      isExample,
       onWalkThrough: () => guidedController.start(),
-      onExplore: () => {},
+      onExplore: () => {
+        // The onboarding choice is an action, not merely a dismissal: show
+        // the read-only example immediately while preserving its origin.
+        exploreExample = true;
+        router.navigate('home');
+      },
       onStartBlank: startBlankStudy,
       onDone: () => { exampleChooser = null; },
     });
@@ -20210,6 +22501,11 @@ function init() {
       showToast,
       advisor: kb.advisor,
       router,
+      // Steps that need shared orientation/progress context consume the same
+      // fresh projection as the shell. Passing it here keeps them from
+      // rebuilding workflow or next-decision state locally.
+      workflowProgress: currentWorkflowProgress(),
+      exploreExample,
       experience: loadOnboarding().experience,
       onNewBlank: startBlankStudy,
       onAdoptExample: adoptExampleTemplate,
