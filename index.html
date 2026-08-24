@@ -374,12 +374,14 @@ button:focus-visible {
 }
 
 /* The name-builder-style field interview (ui/fieldInterview.js, zen-planner
-   Phase 1 feedback): a box plus a small ✓ to confirm it, replacing the
-   earlier full-sentence question + Answer/Skip button pair. The "why" text
-   moves to the box's native title tooltip -- no visible subtitle. */
+   Phase 1 feedback): a box with its labelled confirmation action directly
+   beneath it, replacing the earlier full-sentence question + Answer/Skip
+   button pair. The "why" text moves to the box's native title tooltip -- no
+   visible subtitle. */
 .field-commit-row {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 8px;
 }
 
@@ -389,19 +391,8 @@ button:focus-visible {
   min-width: 0;
 }
 
-/* An "Other…" choice is a select plus a conditional free-text box. It is
-   taller than the one-line fields beside it, so keeping its confirmation
-   button in the same narrow grid track lets that button spill into the next
-   field. Give the composite control its own line and keep the action below
-   it; ordinary one-line interview fields retain their compact side-by-side
-   layout. */
-.field-commit-row:has(> .question-control-group) {
-  flex-wrap: wrap;
-  align-items: flex-start;
-}
-
 .field-commit-row > .question-control-group {
-  flex: 1 1 100%;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -413,7 +404,7 @@ button:focus-visible {
 
 .field-commit {
   flex: 0 0 auto;
-  width: 40px;
+  align-self: flex-start;
   height: 40px;
   min-height: 0;
   font-size: 16px;
@@ -2614,6 +2605,13 @@ td, th { border-color: var(--line); }
   cursor: pointer;
 }
 
+.field-commit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .study-group-token-remove:hover {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
@@ -2890,8 +2888,30 @@ td, th { border-color: var(--line); }
 .field-commit-confirmed { border-color: var(--ok); color: var(--accent-ink); background: var(--ok); }
 .field-commit-confirmed:hover { filter: brightness(.95); }
 
-.reveal.field-chooser-help { margin-top: 2px; }
-.reveal.field-chooser-help > .proposals-empty { margin: 8px 0 0; }
+.field-commit-actions .reveal.field-chooser-help {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.field-commit-actions .field-chooser-help > .reveal-summary {
+  padding: 7px 10px;
+  font-size: 11.5px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.field-commit-actions .field-chooser-help > .reveal-summary::before {
+  margin-right: 6px;
+}
+
+.field-commit-actions .field-chooser-help[open] {
+  flex-basis: 100%;
+}
+
+.field-commit-actions .field-chooser-help > .proposals-empty {
+  margin: 8px 0 0;
+  padding: 0 10px 10px;
+}
 
 .microscopy-section,
 .overview-assay,
@@ -15660,7 +15680,7 @@ function coerceAnswer(question, raw) {
 // nothing about the store, scopeWrite, or provenance.
 
 
-// Novice-only "Not sure? Help me choose" expanders (zen-planner
+// Novice-only "Help me choose" expanders (zen-planner
 // experience-verbosity slice), keyed by the question's `field` path -- NOT
 // its `id`, since `field` is the stable cross-file join key (see
 // engine/interview.js's questions.json contract and lesson 50 in
@@ -15716,7 +15736,7 @@ function appendChooserHelp(cell, question) {
   details.className = 'reveal field-chooser-help';
   const summary = document.createElement('summary');
   summary.className = 'reveal-summary';
-  summary.textContent = 'Not sure? Help me choose';
+  summary.textContent = 'Help me choose';
   details.appendChild(summary);
   const body = document.createElement('p');
   body.className = 'proposals-empty';
@@ -15728,16 +15748,18 @@ function appendChooserHelp(cell, question) {
 /**
  * Render `questions` into `container` as a field grid.
  *
- * `onCommit(question, rawValue)` is invoked when the user clicks a box's ✓,
- * with the box's current value -- the caller writes it (STRONG) and is
- * expected to re-render so `confirmed` flips. An empty box is a no-op: an
- * unfilled field is a skipped question, never a committed blank.
+ * `onCommit(question, rawValue)` is invoked when the user clicks a box's
+ * confirmation button, with the box's current value -- the caller writes it
+ * (STRONG) and is expected to re-render so `confirmed` flips. An empty box
+ * is a no-op: an unfilled field is a skipped question, never a committed
+ * blank.
  *
  * `experience` ('novice' | 'occasional' | 'frequent' | null | undefined,
  * zen-planner experience-verbosity slice) is threaded straight from the
  * step's own render(ctx) call, same as advice.js's defaultExpanded --
- * ONLY 'novice' renders the small "Not sure? Help me choose" expander
- * beneath the handful of fields in FIELD_CHOOSER_HELP above; every other
+ * ONLY 'novice' renders the small "Help me choose" expander beside the
+ * confirmation button for the handful of fields in FIELD_CHOOSER_HELP above;
+ * every other
  * value (including the pre-onboarding null default) renders exactly as
  * before this slice.
  */
@@ -15833,10 +15855,13 @@ function renderFieldInterview(container, { questions, onCommit, experience } = {
       if (raw === '' || raw === undefined || raw === null) return;
       if (typeof onCommit === 'function') onCommit(question, raw);
     });
-    commitRow.appendChild(commitBtn);
+    const actions = document.createElement('div');
+    actions.className = 'field-commit-actions';
+    actions.appendChild(commitBtn);
+    if (experience === 'novice') appendChooserHelp(actions, question);
+    commitRow.appendChild(actions);
 
     cell.appendChild(commitRow);
-    if (experience === 'novice') appendChooserHelp(cell, question);
     grid.appendChild(cell);
   }
 }
