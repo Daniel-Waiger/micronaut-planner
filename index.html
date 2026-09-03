@@ -345,7 +345,15 @@ button:focus-visible {
 .shell-status {
   position: fixed;
   right: 20px;
-  bottom: 20px;
+  /* Clears the sticky .workflow-footer, whose measured height JS publishes
+     as --workflow-footer-height (shell.js). The 68px fallback is the
+     footer's own approximate height so the toast is still clear of it
+     before that JS runs. */
+  bottom: calc(var(--workflow-footer-height, 68px) + 16px);
+  /* Above .workflow-footer (z-index: 3) and the feature-tour dialog
+     (z-index: 1001) -- pointer-events: none below keeps it from blocking
+     clicks on whatever it happens to sit over. */
+  z-index: 1200;
   padding: 10px 16px;
   border-radius: 8px;
   background: var(--panel-2);
@@ -2360,7 +2368,7 @@ textarea:focus-visible {
 
 .shell-status {
   right: 24px;
-  bottom: 24px;
+  bottom: calc(var(--workflow-footer-height, 68px) + 16px);
   max-width: min(420px, calc(100vw - 32px));
   border-radius: 11px;
   color: var(--ink);
@@ -3104,7 +3112,6 @@ td, th { border-color: var(--line); }
   .shell-mobile-controls label { color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
   .mobile-assay-select,
   .mobile-step-select { width: 100%; min-width: 0; padding: 7px 9px; }
-  .shell-main { padding-bottom: 36px; }
   .workflow-footer { gap: 8px; padding: 9px 14px; }
   .workflow-back,
   .workflow-continue { min-width: 0; flex: 1 1 0; }
@@ -5209,14 +5216,14 @@ td, th { border-color: var(--line); }
 }
 
 .shell-main {
-  padding-bottom: 96px;
-  scroll-padding-bottom: 96px;
+  padding-bottom: calc(var(--workflow-footer-height, 68px) + 28px);
+  scroll-padding-bottom: calc(var(--workflow-footer-height, 68px) + 28px);
 }
 
 @media (max-width: 620px) {
   .shell-main {
-    padding-bottom: 112px;
-    scroll-padding-bottom: 112px;
+    padding-bottom: calc(var(--workflow-footer-height, 68px) + 44px);
+    scroll-padding-bottom: calc(var(--workflow-footer-height, 68px) + 44px);
   }
 }
 
@@ -14153,7 +14160,14 @@ function createFeatureWalkthroughController({ router, stops = FEATURE_TOUR, docu
       // Back/Continue, indistinguishable at a glance. Reserving this space
       // keeps the two apart in every layout, not just the one this was caught
       // in.
-      const footerClearance = 96;
+      // Reads the same --workflow-footer-height shell.js publishes (app.css
+      // uses it too), rather than duplicating its own guess at the footer's
+      // height. The +28 slack and 96 fallback match app.css's .shell-main
+      // clearance for a footer this size.
+      const measuredFooterHeight = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--workflow-footer-height')
+      );
+      const footerClearance = Number.isFinite(measuredFooterHeight) ? measuredFooterHeight + 28 : 96;
       const usableHeight = Math.max(dialogHeight + 32, height - footerClearance);
       let dialogLeft = right + gap;
       let dialogTop = Math.max(16, Math.min(rect.top, usableHeight - dialogHeight - 16));
@@ -14590,7 +14604,7 @@ function readPreference(key) {
   try { return localStorage.getItem(key); } catch { return null; }
 }
 function savePreference(key, value) {
-  try { localStorage.setItem(key, value); } catch { /* convenience only */ }
+  try { localStorage.setItem(key, value); return true; } catch { return false; }
 }
 function routeForWorkflow(id) { return id === 'microscopy' ? 'panel' : id; }
 function workflowForRoute(id) { return id === 'panel' ? 'microscopy' : id; }
@@ -14794,7 +14808,7 @@ function renderShell(root, store, router, options = {}) {
   function applyTheme() {
     if (theme === 'system') document.documentElement.removeAttribute('data-theme');
     else document.documentElement.setAttribute('data-theme', theme);
-    savePreference(THEME_KEY, theme);
+    const saved = savePreference(THEME_KEY, theme);
     themeActions.forEach((button, mode) => {
       const selected = mode === theme;
       button.setAttribute('aria-checked', String(selected));
@@ -14820,12 +14834,13 @@ function renderShell(root, store, router, options = {}) {
       themeNavButton.setAttribute('aria-label', `Switch to ${label} theme.`);
       themeNavButton.title = `Light bulb ${bulbState}. Switch to ${label} theme.`;
     }
+    return saved;
   }
   ['dark', 'light', 'system'].forEach((mode) => {
     const label = mode === 'system' ? 'System' : `${mode[0].toUpperCase()}${mode.slice(1)} mode`;
     const modeAction = action(label, () => {
       theme = mode;
-      applyTheme();
+      if (!applyTheme()) showToast('Could not save that preference — it will reset when you reload.');
     }, 'shell-theme-action', 'menuitemradio');
     modeAction.setAttribute('aria-checked', 'false');
     themeActions.set(mode, modeAction);
@@ -15042,9 +15057,13 @@ function renderShell(root, store, router, options = {}) {
         remove.setAttribute('aria-label', `Delete measurement ${assay.label || `Measurement ${index + 1}`}`);
         remove.addEventListener('click', (event) => {
           event.stopPropagation();
-          if (!window.confirm(`Delete measurement "${assay.label || `Measurement ${index + 1}`}"?`)) return;
+          const deletedLabel = assay.label || `Measurement ${index + 1}`;
+          if (!window.confirm(`Delete measurement "${deletedLabel}"?`)) return;
           const next = removeAssay(store.get(), assay.id);
-          if (next) store.patch(next);
+          if (next) {
+            store.patch(next);
+            showToast(`Deleted "${deletedLabel}" and its design, panel, and naming data.`);
+          }
         });
         pill.appendChild(remove);
       }
@@ -15082,7 +15101,13 @@ function renderShell(root, store, router, options = {}) {
     navToggle.setAttribute('aria-label', navCollapsed ? 'Expand step navigation' : 'Collapse step navigation');
     navToggle.setAttribute('aria-expanded', String(!navCollapsed));
   }
-  navToggle.addEventListener('click', () => { navCollapsed = !navCollapsed; savePreference(NAV_COLLAPSED_KEY, navCollapsed ? '1' : '0'); body.classList.toggle('shell-nav-collapsed', navCollapsed); renderNavToggle(); });
+  navToggle.addEventListener('click', () => {
+    navCollapsed = !navCollapsed;
+    const saved = savePreference(NAV_COLLAPSED_KEY, navCollapsed ? '1' : '0');
+    body.classList.toggle('shell-nav-collapsed', navCollapsed);
+    renderNavToggle();
+    if (!saved) showToast('Could not save that preference — it will reset when you reload.');
+  });
   renderNavToggle();
   const navSteps = document.createElement('div');
   navSteps.className = 'nav-steps';
@@ -15096,7 +15121,7 @@ function renderShell(root, store, router, options = {}) {
       ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
       : theme;
     theme = effectiveTheme === 'dark' ? 'light' : 'dark';
-    applyTheme();
+    if (!applyTheme()) showToast('Could not save that preference — it will reset when you reload.');
   });
   applyTheme();
   sticky.append(navToggle, navSteps, navUtilities);
@@ -15132,6 +15157,24 @@ function renderShell(root, store, router, options = {}) {
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   root.append(header, workflowStrip, mobileControls, switcher, body, footer, status);
+
+  // Publishes the footer's real, current height so .shell-status and
+  // .shell-main (app.css) can clear it exactly instead of duplicating a
+  // guessed magic number in three places. A hidden/zero-height footer
+  // naturally publishes 0px, which is the correct clearance for that case.
+  // Guarded for environments without ResizeObserver (e.g. the Node test
+  // runner that imports this module without a browser) -- the CSS fallback
+  // value covers those.
+  if (typeof ResizeObserver === 'function') {
+    const publishFooterHeight = () => {
+      document.documentElement.style.setProperty(
+        '--workflow-footer-height',
+        `${Math.ceil(footer.getBoundingClientRect().height)}px`
+      );
+    };
+    new ResizeObserver(publishFooterHeight).observe(footer);
+    publishFooterHeight();
+  }
 
   function renderWorkflowStrip() {
     const steps = primarySteps();
@@ -17722,7 +17765,7 @@ function createNamingStep(kb) {
   return {
   id: 'naming',
   title: 'Data plan',
-  render(main, store, { advisor, experience, embedded = false } = {}) {
+  render(main, store, { advisor, experience, embedded = false, showToast } = {}) {
     main.textContent = '';
 
     // Commit 1 of the assay tier (schema v3): every experiment has exactly
@@ -17822,12 +17865,18 @@ function createNamingStep(kb) {
     copyBtn.addEventListener('click', async () => {
       // One name per line: the shape that pastes straight into a lab
       // notebook, a spreadsheet column, or a shell loop.
-      const ok = await copyToClipboard(currentFilenames().join('\n'));
+      const names = currentFilenames();
+      const ok = await copyToClipboard(names.join('\n'));
       const original = copyBtn.textContent;
       copyBtn.textContent = ok ? 'Copied!' : 'Copy failed';
       window.setTimeout(() => {
         copyBtn.textContent = original;
       }, 1500);
+      if (showToast) {
+        showToast(ok
+          ? `Copied ${names.length} file name${names.length === 1 ? '' : 's'} to the clipboard.`
+          : 'Could not copy the file names — select them in the list and copy manually.');
+      }
     });
     plannedHead.appendChild(copyBtn);
     plannedBox.appendChild(plannedHead);
@@ -17912,6 +17961,7 @@ function createNamingStep(kb) {
         return;
       }
       downloadTextFile(renderIcs(events), 'micronaut-schedule.ics', 'text/calendar');
+      if (showToast) showToast('Downloaded micronaut-schedule.ics — import it into your calendar app.');
     });
     main.appendChild(downloadScheduleBtn);
 
@@ -21375,8 +21425,9 @@ const studyStep = {
           removeBtn.textContent = 'Delete';
           removeBtn.setAttribute('aria-label', `Delete ${assay.label || `Measurement ${index + 1}`}`);
           removeBtn.addEventListener('click', () => {
+            const deletedLabel = assay.label || `Measurement ${index + 1}`;
             const ok = window.confirm(
-              `Delete "${assay.label || `Measurement ${index + 1}`}" and all its design, panel, and naming data?\n\nThis cannot be undone.`
+              `Delete "${deletedLabel}" and all its design, panel, and naming data?\n\nThis cannot be undone.`
             );
             if (!ok) return;
             const result = removeAssay(store.get(), assay.id);
@@ -21385,6 +21436,7 @@ const studyStep = {
               renderAssayList();
               renderDivergence();
               renderIssues();
+              if (showToast) showToast(`Deleted "${deletedLabel}" and its design, panel, and naming data.`);
             }
           });
           actions.appendChild(removeBtn);
@@ -22059,8 +22111,17 @@ function init() {
     return routeId;
   }
 
+  let guidedStorageFailureAnnounced = false;
   function reportGuidedStorageFailure(error) {
     console.error('Could not persist guided walkthrough progress:', error);
+    // Guarded rather than calling showToast directly: this can fire before
+    // `shell` exists (the initial loadGuidedProgress call below runs ahead of
+    // renderShell), and repeatedly on every step transition once storage is
+    // broken -- announce the failure once, the first time a toast surface is
+    // actually available.
+    if (guidedStorageFailureAnnounced || !shell || typeof shell.showToast !== 'function') return;
+    guidedStorageFailureAnnounced = true;
+    shell.showToast('Walkthrough progress could not be saved — it will restart if you reload.');
   }
 
   let guidedProgressState = loadGuidedProgress(PRIMARY_WORKFLOW, {
