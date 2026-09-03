@@ -1455,12 +1455,6 @@ button:focus-visible {
   cursor: not-allowed;
 }
 
-.study-divergence {
-  color: var(--muted);
-  font-size: 13px;
-  margin: 4px 0 12px;
-}
-
 .study-assay-row {
   align-items: center;
 }
@@ -2616,95 +2610,11 @@ td, th { border-color: var(--line); }
   font-weight: 650;
 }
 
-.study-group-token-field {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 7px;
-  min-height: 48px;
-  padding: 7px 9px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  color: var(--ink);
-  background: var(--panel);
-  cursor: text;
-}
-
-.study-group-token-field:focus-within {
-  border-color: var(--accent);
-  outline: 3px solid color-mix(in srgb, var(--accent) 18%, transparent);
-}
-
-.study-group-token-list {
-  display: contents;
-}
-
-.study-group-token {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  min-height: 40px;
-  padding: 3px 4px 3px 11px;
-  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--line));
-  border-radius: 999px;
-  color: var(--accent-ink);
-  background: var(--accent-soft);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.study-group-token-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.study-group-token-remove {
-  display: inline-grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  color: currentColor;
-  background: transparent;
-  font: inherit;
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-}
-
 .field-commit-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-}
-
-.study-group-token-remove:hover {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-}
-
-.study-group-token-remove:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.study-group-token-input {
-  flex: 1 1 220px;
-  min-width: min(220px, 100%);
-  min-height: 32px;
-  padding: 4px 6px;
-  border: 0;
-  outline: 0;
-  color: var(--ink);
-  background: transparent;
-  font: inherit;
-  font-size: 14px;
 }
 
 .shell-new-study,
@@ -5254,9 +5164,10 @@ globalThis.__MICRONAUT_KB__ = {"advisor":{"rules":[{"body":"The depletion beam d
 // each assay? Tried and rejected -- see docs/plans (Advisor... the assay
 // tier plan), Decision 1. A composed axis can never be MISSING from an
 // assay, which makes "flag an assay with no groups" uncomputable. Per-assay
-// data, seeded from a study-level VOCABULARY at creation time as a real,
-// weak-tagged write, keeps that check possible while still making the
-// common case (every assay uses the same groups) a one-click "apply to all".
+// data, seeded from an EXISTING assay's groups at creation time as a real,
+// weak-tagged write (see groupSeedLevels/seedAssayGroups below), keeps that
+// check possible while still making the common case (every assay uses the
+// same groups) a one-click "copy to measurements that have none".
 //
 // Pure module: no DOM, no store, no imports at all -- a true leaf.
 
@@ -5487,10 +5398,10 @@ function scopeWrite(experiment, path, assayId) {
 }
 
 /**
- * Build a fresh assay whose group axis is seeded from the study's vocabulary,
- * tagged 'kb-default' (WEAK) -- see the module header, Decision 1: a
- * composed/shared axis was rejected because it can never be MISSING; a
- * per-assay axis SEEDED from a vocabulary keeps "flag an assay with no
+ * Build a fresh assay whose group axis is seeded from `levels`, tagged
+ * 'kb-default' (WEAK) -- see the module header, Decision 1: a composed/shared
+ * axis was rejected because it can never be MISSING; a per-assay axis SEEDED
+ * with a copy of another measurement's groups keeps "flag an assay with no
  * groups" computable while still making the common case (every assay uses
  * the same groups) a one-write copy. WEAK is what lets a later real user edit
  * to this assay's groups always win over the seed, never the reverse.
@@ -5503,16 +5414,35 @@ function scopeWrite(experiment, path, assayId) {
  * be silently misjudged as overwriting nothing when it is actually
  * overwriting an untagged seed.
  */
-function seedAssayFromVocabulary(groupVocabulary, id) {
+function seedAssayGroups(levels, id) {
   const assay = emptyAssay(id);
-  const levels =
-    groupVocabulary && Array.isArray(groupVocabulary.levels) ? [...groupVocabulary.levels] : [];
-  assay.design = { ...assay.design, groups: { levels } };
+  assay.design = { ...assay.design, groups: { levels: Array.isArray(levels) ? [...levels] : [] } };
   return {
     assay,
     provenanceSlotKey: `assay:${id}.design.groups`,
     provenanceEntry: { tag: 'kb-default', detail: null },
   };
+}
+
+/**
+ * The group levels a brand-new measurement should start from: there is no
+ * study-level group vocabulary any more (Samples & design on each measurement
+ * is the one place groups are typed -- see ui/steps/design.js), so a new
+ * measurement seeds from whichever EXISTING measurement already has groups,
+ * preferring the active one. Returns [] when nothing in the study has groups
+ * yet, which is exactly what seedAssayGroups already treats as "no seed".
+ */
+function groupSeedLevels(experiment) {
+  const assays = experiment && Array.isArray(experiment.assays) ? experiment.assays : [];
+  const active = assayById(experiment, experiment && experiment.activeAssayId);
+  const activeLevels = active && active.design && active.design.groups && active.design.groups.levels;
+  if (Array.isArray(activeLevels) && activeLevels.length > 0) return activeLevels;
+
+  for (const assay of assays) {
+    const levels = assay && assay.design && assay.design.groups && assay.design.groups.levels;
+    if (Array.isArray(levels) && levels.length > 0) return levels;
+  }
+  return [];
 }
 
 /**
@@ -5532,7 +5462,7 @@ function seedAssayFromVocabulary(groupVocabulary, id) {
  * above for a different case.
  *
  * Pure: never mutates `experiment`; the caller writes the result via
- * store.patch, same as seedAssayFromVocabulary above.
+ * store.patch, same as seedAssayGroups above.
  */
 function removeAssay(experiment, assayId) {
   const assays = experiment && Array.isArray(experiment.assays) ? experiment.assays : [];
@@ -5690,12 +5620,123 @@ function listPaths(obj, path) {
 
   return expand(obj, '', tokens);
 }
+  // ---- src/core/provenance.js ----
+// Tiered provenance: every written value carries a tag classifying how
+// trustworthy its source is, and canOverwrite enforces that a stronger tag
+// can never be silently clobbered by a weaker one.
+//
+// Leaf module: import nothing.
+
+const TAG_TIERS = {
+  user: 'STRONG',
+  user_edited: 'STRONG',
+  imported: 'STRONG',
+  freetext: 'WEAK',
+  'kb-default': 'WEAK',
+  derived: 'WEAK',
+  default: 'WEAK',
+  llm: 'PROVISIONAL',
+  llm_freetext: 'PROVISIONAL',
+};
+
+function tierOf(tag) {
+  const tier = TAG_TIERS[tag];
+  if (!tier) {
+    throw new Error(`unknown provenance tag: ${tag}`);
+  }
+  return tier;
+}
+
+function isProvisional(tag) {
+  return tierOf(tag) === 'PROVISIONAL';
+}
+
+/**
+ * The tag a UI hand-edit through a text field should write: 'user_edited'
+ * when the slot already held a WEAK/PROVISIONAL value (the user is
+ * correcting a machine-sourced guess -- a free-text proposal, a KB default,
+ * an LLM suggestion), 'user' for a first-ever entry or a slot already
+ * STRONG. Both tiers are equally STRONG for canOverwrite's purposes; this
+ * is purely the historical distinction the provenance record keeps, and is
+ * what C1-6's own verification text (and repo lesson E8) require: a value
+ * the user corrected must be distinguishable from one they typed fresh.
+ */
+function editTagFor(existingTag) {
+  if (existingTag == null) return 'user';
+  return tierOf(existingTag) === 'STRONG' ? 'user' : 'user_edited';
+}
+
+/**
+ * True if a value tagged `newTag` may overwrite a slot currently tagged
+ * `existingTag`. A STRONG-tagged slot can never be overwritten by anything
+ * that isn't itself STRONG -- e.g. a `freetext` (WEAK) write must never
+ * clobber a `user` (STRONG) value. A slot with no existing tag yet (first
+ * write) is always overwritable.
+ */
+function canOverwrite(existingTag, newTag) {
+  if (existingTag == null) {
+    return true;
+  }
+  if (tierOf(existingTag) === 'STRONG' && tierOf(newTag) !== 'STRONG') {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Write (replace) the provenance slot at `path`. Replacing the slot outright
+ * -- rather than merging into whatever was there -- means a fresh tag write
+ * never silently carries forward a stale flag (e.g. needsReview) from the
+ * value it is superseding.
+ */
+function tagSlot(experiment, path, tag, detail = null) {
+  experiment.provenance.slots[path] = { tag, detail };
+  return experiment;
+}
+
+/**
+ * Flag the slot at `path` as awaiting confirmation, WITHOUT changing its
+ * tag. The exact inverse of promoteOnUserEdit's `needsReview: false`, and
+ * the reason both live here: `needsReview` is a sibling of `tag` on the slot
+ * (not part of tagSlot's `detail`), so a caller setting it by hand would be
+ * reaching into a shape only this module should know.
+ *
+ * Used by core/draft.js for every slot in a model-drafted study: the value
+ * is real and PROVISIONAL-tagged, and it must additionally be visible as
+ * unconfirmed until a user says otherwise.
+ */
+function markNeedsReview(experiment, path) {
+  const slot = experiment.provenance?.slots?.[path];
+  if (!slot) return experiment;
+  slot.needsReview = true;
+  return experiment;
+}
+
+/**
+ * Retag the slot at `path` as `user_edited` and clear `needsReview`.
+ *
+ * Load-bearing: repo lesson E8 proves that without a retag on user edit, a
+ * provenance gate keyed on a weaker source tag can never clear, because
+ * editing the value in place leaves the ORIGINAL (weaker) tag in place
+ * forever. Any UI that lets a user edit a value must call this.
+ */
+function promoteOnUserEdit(experiment, path) {
+  const existing = experiment.provenance.slots[path];
+  experiment.provenance.slots[path] = {
+    ...(existing ?? {}),
+    tag: 'user_edited',
+    needsReview: false,
+  };
+  return experiment;
+}
   // ---- src/core/schema.js ----
 // Experiment data model: shape, defaults, and version migration.
 //
 // v3 introduced the ASSAY TIER; v4 completes the user-facing terminology
 // migration from the legacy treatment-axis wording to "groups" in the study vocabulary;
-// v5 adds the study-level orientation context.
+// v5 adds the study-level orientation context; v6 retires that study-level
+// vocabulary entirely -- groups are now typed exactly once, per measurement,
+// on that measurement's own design (see core/assay.js's module header).
 // A study (still called Experiment, for
 // continuity with everything already written against that name) holds one
 // or more assays, each an almost-complete v2 slice
@@ -5709,7 +5750,7 @@ function listPaths(obj, path) {
 // stay written against the flat v2 shape forever.
 
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 // `origin` is intentionally descriptive rather than a permission or
 // provenance mechanism. It answers the UI's ownership question ("is this
@@ -5720,9 +5761,9 @@ const SCHEMA_VERSION = 5;
 const STUDY_ORIGINS = new Set(['blank', 'example', 'imported', 'draft', 'template', 'user']);
 
 // These values describe the study's comparison structure. They deliberately
-// do not duplicate group labels (groupVocabulary) or any assay-level design
-// fields: `observational` makes an empty group vocabulary intentional rather
-// than an omitted comparison decision.
+// do not duplicate group labels or any other assay-level design field:
+// `observational` makes an empty group axis intentional rather than an
+// omitted comparison decision.
 const STUDY_COMPARISON_MODES = new Set(['not-decided', 'groups', 'observational']);
 
 const EMPTY_STUDY_CONTEXT = Object.freeze({
@@ -5783,12 +5824,6 @@ function emptyExperiment() {
       text: '',
       history: [],
     },
-    // A SEEDING TEMPLATE for new assays' design.groups, not a live axis --
-    // see core/assay.js's module header on why groups live per-assay instead
-    // of being composed from a shared study-level axis (a composed axis
-    // could never be MISSING from an assay, which would make "flag an
-    // assay with no groups" uncomputable).
-    groupVocabulary: { levels: [] },
     // INVARIANT: length is always >= 1. A study with zero assays is not a
     // study; every consumer (assayView, the UI) may assume at least one.
     assays: [emptyAssay(firstId)],
@@ -5899,7 +5934,6 @@ function migrateV2toV3(obj) {
     ...rest,
     schemaVersion: 3,
     researchQuestion: typeof src.researchQuestion === 'string' ? src.researchQuestion : '',
-    groupVocabulary: { levels: [] },
     assays: [assay],
     activeAssayId: id,
     naming: {
@@ -5990,11 +6024,60 @@ function migrateV4toV5(obj) {
   };
 }
 
+/**
+ * v5 -> v6: retire the study-level `groupVocabulary` field. Groups are now
+ * typed exactly once, per measurement, on that measurement's own Samples &
+ * design -- see core/assay.js's module header and ui/steps/design.js. The
+ * vocabulary was only ever a SEEDING template for brand-new assays (never a
+ * live axis any code read at plan/render time -- see engine/plan.js), so
+ * dropping it changes no filename and no planned condition row.
+ *
+ * Any assay that never got seeded from it (an empty design.groups.levels
+ * with no STRONG user edit on record) is seeded now, so a study whose
+ * vocabulary WAS its only record of the intended groups does not silently
+ * lose them. canOverwrite mirrors the exact refuse-if-STRONG rule
+ * core/store.js's setValueAtPath already applies to a live 'kb-default'
+ * write -- see provenance.js -- so this migration can never clobber a real
+ * user edit, including a deliberately-cleared (STRONG-tagged, empty) axis.
+ */
+function migrateV5toV6(obj) {
+  const src = obj && typeof obj === 'object' ? obj : {};
+  const { groupVocabulary, ...rest } = src;
+  const vocabLevels =
+    groupVocabulary && Array.isArray(groupVocabulary.levels) ? groupVocabulary.levels : [];
+
+  const provenance = src.provenance && typeof src.provenance === 'object' ? src.provenance : {};
+  const { groupVocabulary: droppedSlot, ...slots } = provenance.slots && typeof provenance.slots === 'object' ? provenance.slots : {};
+
+  const assays = Array.isArray(src.assays) ? src.assays : [];
+  const nextAssays =
+    vocabLevels.length === 0
+      ? assays
+      : assays.map((assay) => {
+          const design = assay && typeof assay === 'object' && assay.design && typeof assay.design === 'object' ? assay.design : {};
+          const levels = design.groups && Array.isArray(design.groups.levels) ? design.groups.levels : [];
+          if (levels.length > 0) return assay;
+          const slotKey = `assay:${assay && assay.id}.design.groups`;
+          const existingTag = slots[slotKey] && slots[slotKey].tag;
+          if (!canOverwrite(existingTag, 'kb-default')) return assay;
+          slots[slotKey] = { tag: 'kb-default', detail: null };
+          return { ...assay, design: { ...design, groups: { levels: [...vocabLevels] } } };
+        });
+
+  return {
+    ...rest,
+    schemaVersion: 6,
+    assays: nextAssays,
+    provenance: { ...provenance, slots },
+  };
+}
+
 const MIGRATIONS = {
   1: migrateV1toV2,
   2: migrateV2toV3,
   3: migrateV3toV4,
   4: migrateV4toV5,
+  5: migrateV5toV6,
 };
 
 // v5 saves can have been written by an interrupted or older client. Normalize
@@ -6068,8 +6151,8 @@ function migrate(obj) {
 // Every field this module populates is tagged 'kb-default' (WEAK) in
 // provenance, at the exact assay:<id>.<path> slot key scopeWrite would
 // produce for a live write -- the same convention core/assay.js's
-// seedAssayFromVocabulary already established, so a real user edit to ANY
-// of these fields always wins, never the reverse.
+// seedAssayGroups already established, so a real user edit to ANY of these
+// fields always wins, never the reverse.
 //
 // Deliberately narrow: only fields that actually drive the app's core
 // output (design table + filenames) are seeded --
@@ -6182,8 +6265,8 @@ function createDefaultStudy() {
 
   const assays = ASSAY_SEEDS.map((seed) => {
     const id = shortId();
-    const { assay, provenanceSlotKey, provenanceEntry } = seedAssayFromVocabulary(
-      GROUP_VOCABULARY,
+    const { assay, provenanceSlotKey, provenanceEntry } = seedAssayGroups(
+      GROUP_VOCABULARY.levels,
       id
     );
     provenanceSlots[provenanceSlotKey] = provenanceEntry;
@@ -6202,7 +6285,6 @@ function createDefaultStudy() {
     meta: { ...study.meta, origin: 'example' },
     researchQuestion: RESEARCH_QUESTION,
     studyContext: { ...STUDY_CONTEXT },
-    groupVocabulary: { levels: [...GROUP_VOCABULARY.levels] },
     assays,
     activeAssayId: assays[0].id,
     provenance: {
@@ -6213,7 +6295,6 @@ function createDefaultStudy() {
         'studyContext.system': { tag: 'kb-default', detail: null },
         'studyContext.experimentalUnit': { tag: 'kb-default', detail: null },
         'studyContext.comparisonMode': { tag: 'kb-default', detail: null },
-        groupVocabulary: { tag: 'kb-default', detail: null },
         ...provenanceSlots,
       },
     },
@@ -6937,115 +7018,6 @@ function saveOnboarding({ stage, experience, completed } = {}) {
  */
 function resetOnboarding() {
   onboardingWriteLS(COMPLETED_KEY, '0');
-}
-  // ---- src/core/provenance.js ----
-// Tiered provenance: every written value carries a tag classifying how
-// trustworthy its source is, and canOverwrite enforces that a stronger tag
-// can never be silently clobbered by a weaker one.
-//
-// Leaf module: import nothing.
-
-const TAG_TIERS = {
-  user: 'STRONG',
-  user_edited: 'STRONG',
-  imported: 'STRONG',
-  freetext: 'WEAK',
-  'kb-default': 'WEAK',
-  derived: 'WEAK',
-  default: 'WEAK',
-  llm: 'PROVISIONAL',
-  llm_freetext: 'PROVISIONAL',
-};
-
-function tierOf(tag) {
-  const tier = TAG_TIERS[tag];
-  if (!tier) {
-    throw new Error(`unknown provenance tag: ${tag}`);
-  }
-  return tier;
-}
-
-function isProvisional(tag) {
-  return tierOf(tag) === 'PROVISIONAL';
-}
-
-/**
- * The tag a UI hand-edit through a text field should write: 'user_edited'
- * when the slot already held a WEAK/PROVISIONAL value (the user is
- * correcting a machine-sourced guess -- a free-text proposal, a KB default,
- * an LLM suggestion), 'user' for a first-ever entry or a slot already
- * STRONG. Both tiers are equally STRONG for canOverwrite's purposes; this
- * is purely the historical distinction the provenance record keeps, and is
- * what C1-6's own verification text (and repo lesson E8) require: a value
- * the user corrected must be distinguishable from one they typed fresh.
- */
-function editTagFor(existingTag) {
-  if (existingTag == null) return 'user';
-  return tierOf(existingTag) === 'STRONG' ? 'user' : 'user_edited';
-}
-
-/**
- * True if a value tagged `newTag` may overwrite a slot currently tagged
- * `existingTag`. A STRONG-tagged slot can never be overwritten by anything
- * that isn't itself STRONG -- e.g. a `freetext` (WEAK) write must never
- * clobber a `user` (STRONG) value. A slot with no existing tag yet (first
- * write) is always overwritable.
- */
-function canOverwrite(existingTag, newTag) {
-  if (existingTag == null) {
-    return true;
-  }
-  if (tierOf(existingTag) === 'STRONG' && tierOf(newTag) !== 'STRONG') {
-    return false;
-  }
-  return true;
-}
-
-/**
- * Write (replace) the provenance slot at `path`. Replacing the slot outright
- * -- rather than merging into whatever was there -- means a fresh tag write
- * never silently carries forward a stale flag (e.g. needsReview) from the
- * value it is superseding.
- */
-function tagSlot(experiment, path, tag, detail = null) {
-  experiment.provenance.slots[path] = { tag, detail };
-  return experiment;
-}
-
-/**
- * Flag the slot at `path` as awaiting confirmation, WITHOUT changing its
- * tag. The exact inverse of promoteOnUserEdit's `needsReview: false`, and
- * the reason both live here: `needsReview` is a sibling of `tag` on the slot
- * (not part of tagSlot's `detail`), so a caller setting it by hand would be
- * reaching into a shape only this module should know.
- *
- * Used by core/draft.js for every slot in a model-drafted study: the value
- * is real and PROVISIONAL-tagged, and it must additionally be visible as
- * unconfirmed until a user says otherwise.
- */
-function markNeedsReview(experiment, path) {
-  const slot = experiment.provenance?.slots?.[path];
-  if (!slot) return experiment;
-  slot.needsReview = true;
-  return experiment;
-}
-
-/**
- * Retag the slot at `path` as `user_edited` and clear `needsReview`.
- *
- * Load-bearing: repo lesson E8 proves that without a retag on user edit, a
- * provenance gate keyed on a weaker source tag can never clear, because
- * editing the value in place leaves the ORIGINAL (weaker) tag in place
- * forever. Any UI that lets a user edit a value must call this.
- */
-function promoteOnUserEdit(experiment, path) {
-  const existing = experiment.provenance.slots[path];
-  experiment.provenance.slots[path] = {
-    ...(existing ?? {}),
-    tag: 'user_edited',
-    needsReview: false,
-  };
-  return experiment;
 }
   // ---- src/core/router.js ----
 // Hash-based routing: #/step-id addresses the current step. Survives a page
@@ -10684,7 +10656,6 @@ function buildStudyDocument(experiment, kb, config, baseTemplate) {
     study: {
       title: (exp.meta && exp.meta.title) || '',
       researchQuestion: exp.researchQuestion || '',
-      groupVocabulary: (exp.groupVocabulary && Array.isArray(exp.groupVocabulary.levels) ? exp.groupVocabulary.levels : []).slice(),
     },
     // The fixed 5-stage "how to run this project" backbone, ONCE for the
     // whole study -- see the stageNotes comment above for why this is
@@ -10857,8 +10828,6 @@ const STUDY_SHAPE_FIELDS = new Set([
   'studyContext.system',
   'comparisonMode',
   'comparison-mode',
-  'groupVocabulary',
-  'groupVocabulary.levels',
   'assays',
   'readout',
   'readoutText',
@@ -11133,6 +11102,26 @@ function measurementState(assay, slots, skipped, index) {
   return 'missing';
 }
 
+// The groups "in use" for the whole study: the deduped union across every
+// measurement's own design.groups.levels. There is no study-level group
+// list any more -- each measurement is the one place its groups are typed
+// (ui/steps/design.js) -- so this projection is the closest thing to one,
+// built fresh from the measurements rather than a separately-maintained field
+// that could disagree with them.
+function unionGroupLevels(assays) {
+  const seen = new Set();
+  const union = [];
+  for (const assay of assays) {
+    for (const level of levels(object(object(assay.design).groups).levels)) {
+      const key = level.toLocaleLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      union.push(level);
+    }
+  }
+  return union;
+}
+
 function orderedMeasurements(experiment, assays) {
   const activeId = typeof experiment.activeAssayId === 'string' ? experiment.activeAssayId : '';
   const activeIndex = assays.findIndex((assay) => assay.id === activeId);
@@ -11230,7 +11219,7 @@ function buildExperimentMap(experiment, inputs = {}) {
   const mode = ['not-decided', 'groups', 'observational'].includes(context.comparisonMode)
     ? context.comparisonMode
     : 'not-decided';
-  const groups = levels(object(exp.groupVocabulary).levels);
+  const groups = unionGroupLevels(assays);
 
   const question = {
     value: questionValue,
@@ -11247,22 +11236,12 @@ function buildExperimentMap(experiment, inputs = {}) {
     skipped,
     ['comparison-mode', 'studyContext.comparisonMode']
   );
-  const groupsState =
-    mode === 'observational'
-      ? 'answered'
-      : stateFor(groups, slots, ['groupVocabulary'], skipped, ['comparison-groups', 'groupVocabulary']);
-  const comparison = {
-    mode,
-    groups,
-    state:
-      mode === 'not-decided'
-        ? modeState
-        : modeState !== 'answered'
-          ? modeState
-          : mode === 'observational'
-            ? 'answered'
-            : groupsState,
-  };
+  // Whether the study has said groups vs. observational is the study-shape
+  // decision (modeState above); whether any given measurement HAS its groups
+  // is a per-measurement decision (the measurement-groups:<id> loop below).
+  // There is no separate study-wide "has groups" state any more -- see
+  // unionGroupLevels's comment.
+  const comparison = { mode, groups, state: modeState };
   const experimentalUnit = {
     value: unitValue,
     state: stateFor(
@@ -11303,9 +11282,9 @@ function buildExperimentMap(experiment, inputs = {}) {
   if (modeState !== 'answered') {
     decisions.push(decision('comparison-mode', 'study-shape', 'Choose a comparison structure', 'Say whether this study compares groups or is observational.', 'home', modeState));
   }
-  if (mode === 'groups' && groupsState !== 'answered') {
-    decisions.push(decision('comparison-groups', 'study-shape', 'Add comparison groups or conditions', 'A groups study needs its comparison labels.', 'study', groupsState));
-  }
+  // A groups study whose measurements have no groups yet is already covered
+  // per-measurement below (measurement-groups:<id>) -- no separate study-wide
+  // "add comparison groups" decision.
   const undefinedMeasurements = measurements.filter((measurement) => measurement.state !== 'answered');
   if (measurements.length === 0) {
     decisions.push(decision('measurement-definition', 'study-shape', 'Define a measurement', 'Add a named measurement and what it will observe.', 'study', 'missing'));
@@ -11644,9 +11623,28 @@ const EMPTY_ASSAY = Object.freeze({
 });
 
 const EMPTY_DOCUMENT = Object.freeze({
-  study: Object.freeze({ title: '', researchQuestion: '', groupVocabulary: Object.freeze([]) }),
+  study: Object.freeze({ title: '', researchQuestion: '' }),
   assays: Object.freeze([]),
 });
+
+// The groups "in use" across the whole study: the deduped union of every
+// measurement's own design.groups -- there is no separate study-level group
+// list any more (each measurement types its own, on Samples & design), so
+// this is built fresh from the measurements rather than read off a field
+// that could disagree with them.
+function unionOfGroups(assays) {
+  const seen = new Set();
+  const union = [];
+  for (const assay of Array.isArray(assays) ? assays : []) {
+    for (const level of (assay && assay.design && assay.design.groups) || []) {
+      const key = String(level).toLocaleLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      union.push(level);
+    }
+  }
+  return union;
+}
 
 const EMPTY_CONFORMANCE = Object.freeze({
   readiness: 'needs-review',
@@ -11730,13 +11728,13 @@ function templateFor(stepId, facts) {
       };
     case 'study':
       return {
-        outcome: 'Keep the study’s measurements and comparison labels coherent.',
-        what: 'Measurements lists the observations or analyses in the study and offers reusable comparison labels when helpful.',
-        why: 'Reusable labels keep applicable measurement plans and filenames aligned without overwriting a custom design.',
+        outcome: 'Keep the study’s measurements coherent.',
+        what: 'Measurements lists the observations or analyses in the study; each one defines its own groups on Samples & design.',
+        why: 'A shared registry view keeps every measurement plan and filename aligned without one measurement silently overwriting another.',
         when: 'Use it when adding or naming measurements, or when the study’s comparison structure changes.',
-        how: 'State the research question, then name each measurement and add comparison labels only when they apply.',
-        tryThis: 'Read the question, then check that the comparison labels match your planned comparison or observational study.',
-        exampleSummary: `${text(facts.study.researchQuestion, 'No research question is recorded yet.')} Comparison labels: ${list(facts.study.groupVocabulary, 'none yet')}.`,
+        how: 'State the research question, then name each measurement and copy groups to the others only when they apply.',
+        tryThis: 'Read the question, then check that each measurement’s groups match your planned comparison or observational study.',
+        exampleSummary: `${text(facts.study.researchQuestion, 'No research question is recorded yet.')} Groups in use: ${list(facts.groupsInUse, 'none yet')}.`,
       };
     // One case, because Samples & design, Acquisition and Data plan are one
     // page now (ui/steps/measurement.js). Splitting the walkthrough across
@@ -11799,6 +11797,7 @@ function buildGuidedExampleContent(experiment, options = {}) {
     study: document.study || EMPTY_DOCUMENT.study,
     assay,
     assayCount: Array.isArray(document.assays) ? document.assays.length : 0,
+    groupsInUse: unionOfGroups(document.assays),
     controlCount: (Array.isArray(assay.controls && assay.controls.panel) ? assay.controls.panel.length : 0) +
       (Array.isArray(assay.controls && assay.controls.readout) ? assay.controls.readout.length : 0),
     conformance,
@@ -13382,10 +13381,6 @@ function renderMarkdown(doc) {
     sections.push(heading(2, 'Research question'));
     sections.push(doc.study.researchQuestion);
   }
-  if (doc.study.groupVocabulary.length > 0) {
-    sections.push(`**Study-wide group vocabulary:** ${doc.study.groupVocabulary.join(', ')}`);
-  }
-
   sections.push(heading(2, 'Study diagram'));
   sections.push('```mermaid\n' + renderMermaid(doc) + '\n```');
 
@@ -13895,13 +13890,16 @@ function hasContent(value, seen = new WeakSet()) {
   return hasValue(value);
 }
 
+function anyAssayHasGroups(assays) {
+  return assays.some((assay) => {
+    const levels = assay && assay.design && assay.design.groups && assay.design.groups.levels;
+    return Array.isArray(levels) && levels.some(hasValue);
+  });
+}
+
 function studyProgress(experiment, conformance, assays) {
-  const groupLevels =
-    experiment && experiment.groupVocabulary && Array.isArray(experiment.groupVocabulary.levels)
-      ? experiment.groupVocabulary.levels
-      : [];
   const hasResearchQuestion = hasValue(experiment && experiment.researchQuestion);
-  const hasGroupVocabulary = groupLevels.some(hasValue);
+  const hasGroups = anyAssayHasGroups(assays);
   const allAssaysHaveContent = assays.length > 0 && assays.every(hasAssayContent);
   const crossAssayIssues = Array.isArray(conformance && conformance.crossAssayIssues)
     ? conformance.crossAssayIssues
@@ -13911,8 +13909,8 @@ function studyProgress(experiment, conformance, assays) {
   // so consume its existing output rather than rerunning studyNameIssues or
   // trying to reinterpret severities here.
   if (crossAssayIssues.length > 0) return 'needs-attention';
-  if (hasResearchQuestion && hasGroupVocabulary && allAssaysHaveContent) return 'complete';
-  if (hasResearchQuestion || hasGroupVocabulary || assays.some(hasAssayContent)) return 'in-progress';
+  if (hasResearchQuestion && hasGroups && allAssaysHaveContent) return 'complete';
+  if (hasResearchQuestion || hasGroups || assays.some(hasAssayContent)) return 'in-progress';
   return 'not-started';
 }
 
@@ -15078,7 +15076,7 @@ function renderShell(root, store, router, options = {}) {
     add.addEventListener('click', () => {
       const current = store.get();
       const id = shortId();
-      const { assay, provenanceSlotKey, provenanceEntry } = seedAssayFromVocabulary(current.groupVocabulary, id);
+      const { assay, provenanceSlotKey, provenanceEntry } = seedAssayGroups(groupSeedLevels(current), id);
       store.patch((state) => ({ assays: [...state.assays, assay], activeAssayId: id, provenance: { ...state.provenance, slots: { ...state.provenance.slots, [provenanceSlotKey]: provenanceEntry } } }));
     });
     switcher.appendChild(add);
@@ -16867,8 +16865,8 @@ const guideStep = {
             'One observation or analysis used to answer the study question — its own readout, panel, specimen, and modality. In some fields, a measurement is called an assay.',
           ],
           [
-            'Comparison labels',
-            'Reusable comparison labels (e.g. control, treatment). They seed a measurement’s groups when helpful, but never overwrite a measurement you have already customized. Observational studies may have none.',
+            'Groups',
+            'Your experimental groups (e.g. control, treatment), such as CTL vs. OPP. Set once, per measurement, on that measurement’s Samples & design; “copy to measurements that have none” reuses them elsewhere without overwriting a measurement you have already customized. Observational studies may have none.',
           ],
           [
             'Readout',
@@ -17009,18 +17007,6 @@ function studyMapButton(doc, className, label, onClick) {
   control.textContent = label;
   control.addEventListener('click', onClick);
   return control;
-}
-
-function uniqueLevels(raw) {
-  const seen = new Set();
-  return String(raw)
-    .split(/[\n,]/)
-    .map((value) => value.trim())
-    .filter((value) => {
-      if (!value || seen.has(value.toLocaleLowerCase())) return false;
-      seen.add(value.toLocaleLowerCase());
-      return true;
-    });
 }
 
 function knownMeasurementIds(experiment) {
@@ -17169,21 +17155,24 @@ function createStudyMap({ store, router, getMap, document: suppliedDocument } = 
       radio.checked = currentMode === choice[0];
       radio.addEventListener('change', () => {
         write('studyContext.comparisonMode', choice[0]);
-        groups.row.hidden = choice[0] !== 'groups';
+        groupsSummary.hidden = choice[0] !== 'groups';
       });
       label.append(radio, doc.createTextNode(` ${choice[1]}`));
       fieldset.appendChild(label);
     }
-    const groups = input(doc, {
-      id: 'study-map-comparison-groups',
-      label: 'Comparison labels',
-      value: Array.isArray(map.comparison?.groups) ? map.comparison.groups.join(', ') : '',
-      placeholder: 'e.g. control, treatment',
-      help: 'For a groups study, add the labels you will compare. Separate labels with commas.',
-      onInput: (value) => write('groupVocabulary', { levels: uniqueLevels(value) }),
-    });
-    groups.row.hidden = currentMode !== 'groups';
-    fieldset.appendChild(groups.row);
+    // Read-only: groups themselves are typed exactly once, per measurement,
+    // on Samples & design -- see ui/steps/design.js. This line is a summary
+    // of what those measurements already say, not a second place to type
+    // them (that duplicate editor is what this change removes).
+    const groupsSummary = doc.createElement('p');
+    groupsSummary.className = 'study-map-groups-summary proposals-empty';
+    const groupLevels = Array.isArray(map.comparison?.groups) ? map.comparison.groups : [];
+    groupsSummary.textContent =
+      groupLevels.length > 0
+        ? `Groups in use: ${groupLevels.join(', ')}`
+        : "You'll name the groups on each measurement, under Samples & design.";
+    groupsSummary.hidden = currentMode !== 'groups';
+    fieldset.appendChild(groupsSummary);
     host.appendChild(fieldset);
   }
 
@@ -17411,7 +17400,7 @@ function createStudyMap({ store, router, getMap, document: suppliedDocument } = 
         addStatus.textContent = 'Could not create a unique measurement identifier. Please try again.';
         return;
       }
-      const seeded = seedAssayFromVocabulary(current.groupVocabulary, id);
+      const seeded = seedAssayGroups(groupSeedLevels(current), id);
       const provenance = current.provenance && typeof current.provenance === 'object' ? current.provenance : {};
       const slots = provenance.slots && typeof provenance.slots === 'object' ? provenance.slots : {};
       // One patch keeps the new assay and its weak group seed inseparable;
@@ -17718,12 +17707,6 @@ const FIELD_DEFS = [
     hint: 'The zoom level or objective you used, like 40x or 100x.',
   },
   {
-    key: 'group',
-    label: 'Group',
-    placeholder: 'e.g. CTL, OPP -- set per-row by the Design step, or type one here',
-    hint: 'Which experimental group this file belongs to, such as your control group or a treatment group. Usually filled in for you from the Design page.',
-  },
-  {
     key: 'sample',
     label: 'Sample',
     placeholder: 'e.g. ABC01',
@@ -17802,7 +17785,26 @@ function createNamingStep(kb) {
     // effectiveNamingFields (an engine function that must never learn
     // assays exist) already expects.
     const prefill = effectiveNamingFields(assayView(store.get(), assayId));
+
+    // Group is READ-ONLY here. It used to be a text box a person could type
+    // into directly, duplicating the same question Samples & design already
+    // asks -- see docs/plans, this task's plan file. Now it just shows what
+    // that page decided, updated by update() below from the same planned
+    // rows the filename preview uses, so this line can never disagree with
+    // the {group} token actually embedded in the filenames.
+    const groupRow = document.createElement('div');
+    groupRow.className = 'field-row';
+    const groupLabelText = document.createElement('span');
+    groupLabelText.className = 'field-label';
+    groupLabelText.textContent = 'Group';
+    groupRow.appendChild(groupLabelText);
+    const groupValue = document.createElement('span');
+    groupValue.className = 'field-readonly-value';
+    groupValue.title = 'Set on Samples & design for this measurement -- not editable here.';
+    groupRow.appendChild(groupValue);
+
     for (const field of FIELD_DEFS) {
+      if (field.key === 'sample') grid.appendChild(groupRow);
       const row = document.createElement('label');
       row.className = 'field-row';
 
@@ -18002,6 +18004,14 @@ function createNamingStep(kb) {
         // rendering so the two paths can never format replicates differently.
         raw[field.key] = prefix ? formatReplicateToken(prefix, Number(value)) : value;
       }
+      // group has no input box any more (Samples & design is the one place it
+      // is typed), but a value already saved to naming.fields.group -- from
+      // before this change, or a deliberate one-off with no design at all --
+      // must still reach the filename. planFilenames overrides this with the
+      // design's own group label whenever the design actually has groups, so
+      // this is only ever the value that survives for a design with none.
+      const storedGroup = assayView(store.get(), assayId).naming?.fields?.group;
+      if (storedGroup) raw.group = storedGroup;
       return raw;
     }
 
@@ -18027,6 +18037,12 @@ function createNamingStep(kb) {
       const rawFields = currentRawFields();
       lastPlanned = planFilenames(view, NAMING_CONFIG);
       advicePanel.update(view);
+
+      // Distinct group labels actually embedded in the planned filenames --
+      // reading lastPlanned rather than the design directly means this can
+      // never show a group the filenames themselves disagree with.
+      const groupLabels = [...new Set(lastPlanned.map((entry) => entry.groupLabel).filter(Boolean))];
+      groupValue.textContent = groupLabels.length > 0 ? groupLabels.join(', ') : 'None';
 
       const count = lastPlanned.length;
       plannedLabel.textContent =
@@ -20921,9 +20937,11 @@ const settingsStep = {
 // read-only-plus-"Edit on Study map" pattern Samples & design already uses for
 // the experimental unit.
 //
-// Group-vocabulary authoring and the cross-assay collision check stay here:
-// both are properties of the measurement COLLECTION, which is what this page
-// owns.
+// Groups are typed once, per measurement, on that measurement's own Samples
+// & design page -- this page only shows them (the registry's Groups column)
+// and offers a "copy to measurements that have none" shortcut, a property of
+// the measurement COLLECTION rather than any one measurement. The
+// cross-assay collision check stays here for the same reason.
 //
 // No advice panel: every advisor rule keys on a per-assay fact
 // (acquisition.modality, etc.); study shape is not a guidance surface the KB
@@ -20968,51 +20986,6 @@ function registrySelect(parent, { label, options, onChange }) {
   wrapper.appendChild(select);
   parent.appendChild(wrapper);
   return select;
-}
-
-/**
- * "N of M assays use this vocabulary" -- how many assays' current group axis
- * matches the study's vocabulary verbatim. Order-sensitive (JSON.stringify
- * on the array): a vocabulary and an assay that list the same groups in a
- * different order are NOT considered converged, since order is part of what
- * "matches the template" means here, not incidental.
- *
- * Returns null when the vocabulary is empty -- there is nothing for an
- * assay's groups to converge TO yet, so there is nothing useful to report.
- */
-function groupDivergenceSummary(experiment) {
-  const vocabLevels =
-    experiment.groupVocabulary && Array.isArray(experiment.groupVocabulary.levels)
-      ? experiment.groupVocabulary.levels
-      : [];
-  if (vocabLevels.length === 0) return null;
-
-  const assays = Array.isArray(experiment.assays) ? experiment.assays : [];
-  const vocabKey = JSON.stringify(vocabLevels);
-  const matching = assays.filter((assay) => {
-    const levels = assay.design && assay.design.groups && assay.design.groups.levels;
-    return JSON.stringify(Array.isArray(levels) ? levels : []) === vocabKey;
-  }).length;
-
-  const total = assays.length;
-  return `${matching} of ${total} measurement${total === 1 ? '' : 's'} reuse these comparison labels.`;
-}
-
-function studyGroupTokens(value) {
-  return String(value)
-    .split(/[,\n]/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-}
-
-function uniqueStudyGroups(values) {
-  const seen = new Set();
-  return values.filter((value) => {
-    const key = value.toLocaleLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
 }
 
 /**
@@ -21076,133 +21049,36 @@ const studyStep = {
     rqRow.appendChild(rqEdit);
     main.appendChild(rqRow);
 
-    // --- Shared comparison labels -----------------------------------------
-    const vocabHeading = document.createElement('div');
-    vocabHeading.className = 'design-subheading';
-    vocabHeading.textContent = 'Comparison labels';
-    main.appendChild(vocabHeading);
+    // --- Groups -------------------------------------------------------------
+    // Groups are typed exactly once, per measurement, on that measurement's
+    // own Samples & design (ui/steps/design.js). This page only ever shows
+    // them (the registry's Groups column below) and offers a one-click way to
+    // reuse an existing measurement's groups on the others.
+    const groupsHeading = document.createElement('div');
+    groupsHeading.className = 'design-subheading';
+    groupsHeading.textContent = 'Groups';
+    main.appendChild(groupsHeading);
 
-    const vocabHelp = document.createElement('p');
-    vocabHelp.className = 'proposals-empty supporting-description';
-    vocabHelp.textContent =
-      'Reuse these labels when measurements compare groups or conditions. Observational studies may have no comparison labels.';
-    main.appendChild(vocabHelp);
-
-    const vocabRow = document.createElement('div');
-    vocabRow.className = 'field-row';
-    const vocabLabel = document.createElement('span');
-    vocabLabel.className = 'field-label';
-    vocabLabel.id = 'study-group-vocabulary-label';
-    vocabLabel.textContent = 'Labels to reuse for comparisons';
-    vocabRow.appendChild(vocabLabel);
-    const tokenField = document.createElement('div');
-    tokenField.className = 'study-group-token-field';
-    tokenField.setAttribute('role', 'group');
-    tokenField.setAttribute('aria-labelledby', vocabLabel.id);
-    vocabRow.appendChild(tokenField);
-    const tokenList = document.createElement('div');
-    tokenList.className = 'study-group-token-list';
-    tokenField.appendChild(tokenList);
-    const vocabInput = document.createElement('input');
-    vocabInput.type = 'text';
-    vocabInput.className = 'study-group-token-input';
-    vocabInput.placeholder = 'Type a comparison label, then press Enter';
-    vocabInput.setAttribute('aria-label', 'Add a comparison label');
-    vocabInput.title =
-      'A reusable seed, not a shared live axis -- each measurement keeps its own copy and can diverge freely. Used to seed new measurements and by "Apply to all measurements" below.';
-    tokenField.appendChild(vocabInput);
-
-    function vocabularyLevels() {
-      const levels = store.get().groupVocabulary && store.get().groupVocabulary.levels;
-      return Array.isArray(levels) ? levels : [];
-    }
-
-    function saveVocabulary(levels) {
-      store.setPath('groupVocabulary', { levels }, 'user');
-      renderGroupTokens();
-      renderDivergence();
-    }
-
-    function renderGroupTokens() {
-      tokenList.textContent = '';
-      vocabularyLevels().forEach((group, index) => {
-        const token = document.createElement('span');
-        token.className = 'study-group-token';
-        const text = document.createElement('span');
-        text.className = 'study-group-token-text';
-        text.textContent = group;
-        token.appendChild(text);
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.className = 'study-group-token-remove';
-        remove.textContent = '×';
-        remove.setAttribute('aria-label', `Remove comparison label ${group}`);
-        remove.addEventListener('pointerdown', (event) => {
-          // Keep pointer removal from blurring and committing the adjacent
-          // input before this same control receives its click.
-          event.preventDefault();
-        });
-        remove.addEventListener('click', () => {
-          saveVocabulary(vocabularyLevels().filter((_, itemIndex) => itemIndex !== index));
-          vocabInput.focus();
-        });
-        token.appendChild(remove);
-        tokenList.appendChild(token);
-      });
-    }
-
-    function commitPendingGroups(rawValue = vocabInput.value) {
-      const additions = studyGroupTokens(rawValue);
-      if (additions.length === 0) return false;
-      saveVocabulary(uniqueStudyGroups([...vocabularyLevels(), ...additions]));
-      vocabInput.value = '';
-      return true;
-    }
-
-    vocabInput.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ',') return;
-      event.preventDefault();
-      commitPendingGroups();
-    });
-    vocabInput.addEventListener('blur', (event) => {
-      // Moving from the input to a token's Remove button must not rebuild
-      // the token list before that button receives its click.
-      if (event.relatedTarget && tokenField.contains(event.relatedTarget)) return;
-      commitPendingGroups();
-    });
-    vocabInput.addEventListener('paste', (event) => {
-      const pasted = event.clipboardData && event.clipboardData.getData('text');
-      if (!pasted || !/[,\n]/.test(pasted)) return;
-      event.preventDefault();
-      commitPendingGroups(`${vocabInput.value}${vocabInput.value ? ',' : ''}${pasted}`);
-    });
-    tokenField.addEventListener('click', (event) => {
-      if (event.target === tokenField || event.target === tokenList) vocabInput.focus();
-    });
-    main.appendChild(vocabRow);
-
-    const divergenceLine = document.createElement('p');
-    divergenceLine.className = 'study-divergence';
-    main.appendChild(divergenceLine);
-
-    function renderDivergence() {
-      const summary = groupDivergenceSummary(store.get());
-      divergenceLine.textContent = summary || '';
-      divergenceLine.hidden = !summary;
-    }
-
-    renderGroupTokens();
+    const groupsHelp = document.createElement('p');
+    groupsHelp.className = 'proposals-empty supporting-description';
+    groupsHelp.textContent =
+      'Each measurement defines its own groups on its Samples & design page. Observational studies may have none.';
+    main.appendChild(groupsHelp);
 
     const applyBtn = document.createElement('button');
     applyBtn.type = 'button';
     applyBtn.className = 'add-factor-button';
-    applyBtn.textContent = 'Apply to all measurements';
+    applyBtn.textContent = 'Copy groups to measurements that have none';
     applyBtn.title =
-      "Seeds these comparison labels into every measurement that has not customized its own groups -- a measurement whose groups you already edited by hand is left alone.";
+      "Copies the active measurement's groups into every OTHER measurement that has not defined its own -- a measurement whose groups you already edited by hand is left alone.";
     applyBtn.addEventListener('click', () => {
       const experiment = store.get();
-      const levels = (experiment.groupVocabulary && experiment.groupVocabulary.levels) || [];
+      const levels = groupSeedLevels(experiment);
       const assays = Array.isArray(experiment.assays) ? experiment.assays : [];
+      if (levels.length === 0) {
+        if (showToast) showToast('No measurement has groups defined yet -- add some on Samples & design first.');
+        return;
+      }
       let applied = 0;
       let skipped = 0;
       for (const assay of assays) {
@@ -21223,7 +21099,6 @@ const studyStep = {
         );
       }
       renderAssayList();
-      renderDivergence();
     });
     main.appendChild(applyBtn);
 
@@ -21289,7 +21164,7 @@ const studyStep = {
       // Same seeding path the shell's switcher uses, so a measurement created
       // here is identical to one created there -- one way to make one.
       const id = shortId();
-      const { assay, provenanceSlotKey, provenanceEntry } = seedAssayFromVocabulary(current.groupVocabulary, id);
+      const { assay, provenanceSlotKey, provenanceEntry } = seedAssayGroups(groupSeedLevels(current), id);
       store.patch((state) => ({
         assays: [...state.assays, assay],
         activeAssayId: id,
@@ -21434,7 +21309,6 @@ const studyStep = {
             if (result) {
               store.patch(result);
               renderAssayList();
-              renderDivergence();
               renderIssues();
               if (showToast) showToast(`Deleted "${deletedLabel}" and its design, panel, and naming data.`);
             }
@@ -21478,7 +21352,6 @@ const studyStep = {
       }
     }
 
-    renderDivergence();
     renderAssayList();
     renderIssues();
   },
