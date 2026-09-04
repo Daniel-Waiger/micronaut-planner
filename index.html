@@ -255,6 +255,7 @@ button:focus-visible {
   padding: 10px 12px;
   cursor: pointer;
   white-space: nowrap;
+  text-decoration: none;
 }
 
 /* Icon-only when collapsed, text-only when expanded (never both at once) --
@@ -429,6 +430,7 @@ button:focus-visible {
 .nav-utilities .nav-step[data-step-id] { justify-content: center; color: #fff; text-align: center; border-color: transparent; }
 .nav-utilities .nav-step[data-step-id="feedback"] { background: #d95f02; }
 .nav-utilities .nav-step[data-step-id="settings"] { background: #c62828; }
+.nav-utilities .nav-step[data-step-id="release-notes"] { background: #4f46e5; }
 .nav-utilities .nav-step[data-step-id]:hover, .nav-utilities .nav-step[data-step-id].active { color: #fff; filter: brightness(1.08); box-shadow: none; }
 .shell-utilities { display: none; }
 
@@ -7201,6 +7203,12 @@ function createStore(initialExperiment) {
     subscribe,
   };
 }
+  // ---- src/core/version.js ----
+// The Planner's release version, bumped by hand on every release. Must match
+// the newest `## [x.y.z]` heading in web/release-notes/CHANGELOG.md (checked
+// by web/tests -- see that file's own header for the retroactive history
+// this number continues).
+const APP_VERSION = '0.16.0';
   // ---- src/engine/validation.js ----
 // Faithful port of src/microscopy_naming_assistant/validation.py — field
 // validation and path-length warnings. Leaf module: import nothing.
@@ -15244,6 +15252,20 @@ function renderShell(root, store, router, options = {}) {
       const button = utilityButtons.get(id);
       if (button) navUtilities.appendChild(button);
     });
+    const releaseNotesLink = document.createElement('a');
+    releaseNotesLink.className = 'nav-step';
+    releaseNotesLink.dataset.stepId = 'release-notes';
+    releaseNotesLink.href = 'release-notes/';
+    releaseNotesLink.target = '_blank';
+    releaseNotesLink.rel = 'noopener noreferrer';
+    releaseNotesLink.setAttribute('aria-label', 'Release notes (opens in a new tab)');
+    releaseNotesLink.title = 'Release notes (opens in a new tab)';
+    releaseNotesLink.appendChild(createIcon('template', 'nav-step-icon'));
+    const releaseNotesLabel = document.createElement('span');
+    releaseNotesLabel.className = 'nav-step-label';
+    releaseNotesLabel.textContent = 'Release notes';
+    releaseNotesLink.appendChild(releaseNotesLabel);
+    navUtilities.appendChild(releaseNotesLink);
     navUtilities.appendChild(themeNavButton);
   }
   function renderMobileControls(activeId = router.current()) {
@@ -20922,6 +20944,7 @@ function createPanelStep(kb) {
   };
 }
   // ---- src/ui/steps/settings.js ----
+
 function settingsButton(label, onClick, className = 'copy-button') { const node = document.createElement('button'); node.type = 'button'; node.className = className; node.textContent = label; node.addEventListener('click', onClick); return node; }
 const settingsStep = {
   id: 'settings', title: 'Settings', utility: true,
@@ -20934,7 +20957,10 @@ const settingsStep = {
     const file = document.createElement('input'); file.type = 'file'; file.accept = '.json,application/json'; file.hidden = true; file.addEventListener('change', () => { const selected = file.files?.[0]; file.value = ''; if (selected) Promise.resolve(options.onImportProject?.(selected)); });
     actions.append(settingsButton('Import project backup', () => file.click()), file);
     actions.append(settingsButton('Start a blank study', () => { if (window.confirm('Start a blank study? Your current work remains available in Restore.')) options.onNewBlank?.(); }));
-    main.append(title, intro, actions);
+    const version = document.createElement('p');
+    version.className = 'proposals-empty supporting-description';
+    version.textContent = `Version ${APP_VERSION}`;
+    main.append(title, intro, actions, version);
   },
 };
   // ---- src/ui/steps/study.js ----
