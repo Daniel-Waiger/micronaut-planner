@@ -5249,18 +5249,35 @@ td, th { border-color: var(--line); }
    rail left ~85px for the label -- so "Measurements" and "Measurement 1" both
    rendered as "Measur…", which is worse than no label at all. Let the label
    wrap onto a second line instead of truncating: a two-line nav item is
-   ordinary, an ambiguous one is not. */
+   ordinary, an ambiguous one is not.
+
+   That first fix used overflow-wrap: anywhere, which does keep the label on
+   screen but does not care *where* it breaks -- a single unbreakable word
+   ("Measurements") got split mid-word ("Measureme" / "nts") whenever the
+   badge squeezed the label below the word's own width. The label's
+   min-width: 0 is what let that squeeze happen: a flex-shrink item with no
+   floor will shrink past its content's min-content width rather than push
+   the row to wrap. min-width: min-content puts a floor under the label at
+   the width of its longest unbreakable word, and flex-wrap on the row gives
+   the badge somewhere to go once label + badge no longer both fit: it drops
+   to its own line (still right-aligned there via its existing
+   margin-left: auto) instead of forcing the label to concede width it
+   doesn't have to spare. Multi-word labels ("Bacterial viability") are
+   unaffected -- their min-content width is only their longest word, so they
+   keep wrapping internally at the word boundary exactly as before, on one
+   row alongside the badge, whenever that still fits. */
 .nav-step {
   align-items: flex-start;
+  flex-wrap: wrap;
   white-space: normal;
 }
 
 .nav-step-label {
   flex: 1 1 auto;
-  min-width: 0;
+  min-width: min-content;
   overflow: visible;
   text-overflow: clip;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 
 .nav-step-icon {
@@ -7643,7 +7660,7 @@ function createStore(initialExperiment) {
 // the newest `## [x.y.z]` heading in web/release-notes/CHANGELOG.md (checked
 // by web/tests -- see that file's own header for the retroactive history
 // this number continues).
-const APP_VERSION = '0.17.0';
+const APP_VERSION = '0.18.0';
   // ---- src/engine/validation.js ----
 // Faithful port of src/microscopy_naming_assistant/validation.py — field
 // validation and path-length warnings. Leaf module: import nothing.
@@ -17806,13 +17823,16 @@ function createStudyMap({ store, router, getMap, document: suppliedDocument } = 
   }
 
   function appendSummary(host, map) {
-    const heading = doc.createElement('h2');
-    heading.className = 'design-subheading';
-    heading.textContent = 'Study map';
+    // No heading here: this section renders inside ui/steps/home.js, directly
+    // below that step's own "Study map" <h1> (and the "Plan my study" card).
+    // A second "Study map" heading right above this one's own content used to
+    // repeat the step title verbatim with nothing distinguishing the two --
+    // this component isn't used standalone anywhere else (see createStudyMap
+    // call sites), so there is no other page relying on it for its own title.
     const intro = doc.createElement('p');
     intro.className = 'proposals-empty';
     intro.textContent = `${map.orientation?.answered || 0} of ${map.orientation?.total || 5} orientation decisions are answered. Edit any value here; detailed planning remains directly available in every workspace.`;
-    host.append(heading, intro);
+    host.append(intro);
 
     const facts = doc.createElement('div');
     facts.className = 'study-map-summary';
@@ -19470,7 +19490,15 @@ function renderReviewExperimentMapSummary(parent, map) {
     const item = document.createElement('li');
     const label = reviewMeasurementLabel(measurement?.label, index + 1);
     const readout = reviewMapValue(measurement?.readout, 'Not decided');
-    item.textContent = `${label}: ${readout}`;
+    // The seed/example study (and plenty of real ones) name a measurement
+    // after its readout verbatim -- e.g. label "Bacterial viability" with
+    // readout "Bacterial viability" -- so a naive `${label}: ${readout}`
+    // renders as a stutter ("Bacterial viability: Bacterial viability").
+    // The label is always shown; the readout adds information only when it
+    // says something the label doesn't already say.
+    item.textContent = label.trim().toLowerCase() === readout.trim().toLowerCase()
+      ? label
+      : `${label}: ${readout}`;
     list.appendChild(item);
   }
   if (measurements.length === 0) {
@@ -20865,17 +20893,34 @@ function createPanelStep(kb) {
         'A qualitative check for spectral spillover across this measurement’s fluorophores -- excitation/emission peak proximity only, not a spectral-overlap integral.';
       fluorophoresSection.appendChild(explainer);
 
-      const banner = document.createElement('div');
-      banner.className = 'panel-review-banner';
-      banner.textContent =
-        'Spectral values below are drafted by Claude from common published references and have not yet been reviewed by a microscopy specialist -- treat exact peak numbers as approximate until reviewed.';
-      fluorophoresSection.appendChild(banner);
-
       // assayId is already cached above (shared with the interview section).
       const view = assayView(store.get(), assayId);
       const markersText = (view.naming && view.naming.fields && view.naming.fields.markers) || '';
 
       const { panelState, entries } = resolvePanel(markersText, kb.index, kb.markersKb, kb.spectra);
+
+      // The banner has to describe THIS panel's fluorophores, not the pack as a
+      // whole: part of spectra.json is now matched against cited vendor sources,
+      // so a blanket "drafted by Claude" claim is wrong for a panel that happens
+      // to be entirely source-cited. Rendered after resolvePanel so it can read
+      // the resolved entries; no entry with a spectrum means nothing to caveat.
+      const knownEntries = entries.filter((entry) => entry.state === 'known');
+      const draftedCount = knownEntries.filter((entry) => entry.reviewStatus === 'claude-drafted').length;
+      if (knownEntries.length > 0) {
+        const banner = document.createElement('div');
+        banner.className = 'panel-review-banner';
+        if (draftedCount === 0) {
+          banner.textContent =
+            'Spectral values below match cited vendor or publication sources, but have not been reviewed by a microscopy specialist -- confirm exact peak numbers against your own filter sets.';
+        } else if (draftedCount === knownEntries.length) {
+          banner.textContent =
+            'Spectral values below are drafted by Claude from common published references and have not yet been reviewed by a microscopy specialist -- treat exact peak numbers as approximate until reviewed.';
+        } else {
+          banner.textContent =
+            'Spectral values below are a mix of cited vendor or publication sources and values drafted by Claude from common published references (see each fluorophore’s badge). None has been reviewed by a microscopy specialist -- treat exact peak numbers as approximate.';
+        }
+        fluorophoresSection.appendChild(banner);
+      }
 
       if (panelState === 'unanswered') {
         const empty = document.createElement('p');
