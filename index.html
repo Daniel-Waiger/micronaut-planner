@@ -7660,7 +7660,7 @@ function createStore(initialExperiment) {
 // the newest `## [x.y.z]` heading in web/release-notes/CHANGELOG.md (checked
 // by web/tests -- see that file's own header for the retroactive history
 // this number continues).
-const APP_VERSION = '0.19.0';
+const APP_VERSION = '0.20.0';
   // ---- src/engine/validation.js ----
 // Faithful port of src/microscopy_naming_assistant/validation.py — field
 // validation and path-length warnings. Leaf module: import nothing.
@@ -15056,6 +15056,11 @@ const ICONS = {
     ['path', 'M5 5h14v10H9l-4 4z'],
     ['path', 'M8 9h8M8 12h5'],
   ],
+  manual: [
+    ['path', 'M12 6.5c-1.5-1.2-3.6-2-6.5-2v13c2.9 0 5 .8 6.5 2'],
+    ['path', 'M12 6.5c1.5-1.2 3.6-2 6.5-2v13c-2.9 0-5 .8-6.5 2'],
+    ['path', 'M12 6.5v13'],
+  ],
   settings: [
     ['circle', 'cx=12,cy=12,r=3'],
     ['path', 'M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.5-2.3 1A7 7 0 0 0 15 6l-.3-2.5h-5L9.4 6a7 7 0 0 0-1.5 1L5.6 6 3.6 9.5l2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.5 2.3-1a7 7 0 0 0 1.5 1l.3 2.5h5l.3-2.5a7 7 0 0 0 1.5-1l2.3 1 2-3.5-2-1.5c.1-.3.1-.7.1-1z'],
@@ -15754,6 +15759,20 @@ function renderShell(root, store, router, options = {}) {
       const button = utilityButtons.get(id);
       if (button) navUtilities.appendChild(button);
     });
+    const manualLink = document.createElement('a');
+    manualLink.className = 'nav-step';
+    manualLink.dataset.stepId = 'manual';
+    manualLink.href = 'manual/';
+    manualLink.target = '_blank';
+    manualLink.rel = 'noopener noreferrer';
+    manualLink.setAttribute('aria-label', 'User manual (opens in a new tab)');
+    manualLink.title = 'User manual (opens in a new tab)';
+    manualLink.appendChild(createIcon('manual', 'nav-step-icon'));
+    const manualLabel = document.createElement('span');
+    manualLabel.className = 'nav-step-label';
+    manualLabel.textContent = 'User manual';
+    manualLink.appendChild(manualLabel);
+    navUtilities.appendChild(manualLink);
     const releaseNotesLink = document.createElement('a');
     releaseNotesLink.className = 'nav-step';
     releaseNotesLink.dataset.stepId = 'release-notes';
@@ -17472,6 +17491,17 @@ const guideStep = {
         );
       })
     );
+
+    const manualPara = document.createElement('p');
+    manualPara.className = 'guide-para';
+    manualPara.append('This page is a quick reference. For a longer, step-by-step walkthrough of every screen, see the ');
+    const manualLink = document.createElement('a');
+    manualLink.href = 'manual/';
+    manualLink.target = '_blank';
+    manualLink.rel = 'noopener noreferrer';
+    manualLink.textContent = 'full user manual';
+    manualPara.append(manualLink, ' (opens in a new tab).');
+    main.appendChild(manualPara);
   },
 };
   // ---- src/ui/studyMap.js ----
