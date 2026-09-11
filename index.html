@@ -5069,9 +5069,20 @@ td, th { border-color: var(--line); }
   color: var(--muted);
 }
 
-/* State is carried by the text, never by colour alone. */
+/* State is carried by the text, never by colour alone: every badge/chip below
+   still renders its own status word (measurementStatusLabel), and `data-tone`
+   only ever adds a colour on top of that text. */
+.measurement-status-badges,
+.measurement-status-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
 .measurement-status-badge {
   display: inline-block;
+  max-width: 100%;
   padding: 3px 10px;
   border-radius: 999px;
   border: 1px solid var(--line);
@@ -5079,20 +5090,58 @@ td, th { border-color: var(--line); }
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
-  white-space: nowrap;
+  /* Not nowrap: a narrow host column (the registry status cell, app.css:4996's
+     grid stays unchanged) can squeeze this flex item below its label's
+     single-line width. Letting the label itself wrap onto a second line here
+     is what keeps it from overflowing that column horizontally instead. */
+  overflow-wrap: anywhere;
 }
 
-.measurement-status-badge[data-status="needs-decision"] {
+.measurement-status-badge[data-tone="neutral"] {
+  border-color: var(--line);
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
+.measurement-status-badge[data-tone="progress"] {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.measurement-status-badge[data-tone="attention"] {
   border-color: color-mix(in srgb, var(--warn) 40%, var(--line));
   background: var(--warn-soft);
   color: var(--warn);
 }
 
-.measurement-status-badge[data-status="ready"] {
+.measurement-status-badge[data-tone="ok"] {
   border-color: color-mix(in srgb, var(--ok) 40%, var(--line));
   background: var(--ok-soft);
   color: var(--ok);
 }
+
+/* Chips are context for the headline badge, not a second headline -- flatter
+   background/border than the badge (both stay neutral regardless of tone)
+   and a smaller, lighter face, so only the text colour carries the tone and
+   the eye still lands on the headline badge first. */
+.measurement-status-chip {
+  display: inline-block;
+  max-width: 100%;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.measurement-status-chip[data-tone="neutral"] { color: var(--muted); }
+.measurement-status-chip[data-tone="progress"] { color: var(--accent); }
+.measurement-status-chip[data-tone="attention"] { color: var(--warn); }
+.measurement-status-chip[data-tone="ok"] { color: var(--ok); }
 
 .field-readonly-value {
   flex: 1 1 240px;
@@ -5336,6 +5385,457 @@ globalThis.__MICRONAUT_KB__ = {"advisor":{"rules":[{"body":"The depletion beam d
 <script>
 (function () {
 'use strict';
+  // ---- src/core/appController.js ----
+// The lifecycle coordinator extracted out of main.js's init(). main.js calls
+// init() at module scope (see main.js's own comment on that), so nothing
+// inside it could ever be imported by a test -- exactly the situation
+// core/persist.js's loadMostRecentRecoverable and engine/kbpack.js's
+// shapeAppKb were already extracted to fix. This module is the same move
+// applied to the rest of init(): every closure that touches `store` and
+// `persist` (the recovery ring, project import/export, the guided-progress
+// transitions, and the debounced autosave subscriber) now lives here, built
+// from injected collaborators instead of module-level imports, so a test can
+// supply fakes for all of them.
+//
+// Shell rendering, the walkthrough controllers, explainGuided and
+// renderActiveStep all stay in main.js -- they are view/routing concerns,
+// not persistence ones, and moving them would not make anything more
+// testable.
+//
+// `timers` (`{ setTimeout, clearTimeout }`) makes the 500ms autosave debounce
+// deterministic under a fake clock; `now` makes `savedAt` deterministic;
+// `logger` (default `console`) lets a test assert a warning fired without
+// polluting console output.
+
+/**
+ * A study's origin describes how it entered the workspace; it is not
+ * provenance. Keep this immutable so imports/restores replace the entire
+ * snapshot rather than leaking metadata from the study that was open before.
+ */
+function withOrigin(experiment, origin) {
+  return { ...experiment, meta: { ...(experiment.meta || {}), origin } };
+}
+
+function projectFilename(experiment) {
+  const title = String(experiment?.meta?.title || 'micronaut-study')
+    .trim()
+    .replace(/[^A-Za-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `${title || 'micronaut-study'}.micronaut.json`;
+}
+
+/**
+ * The one shared test for "did this study arrive from the shipped example":
+ * an opened example is tagged `'template'` ("started from the example") the
+ * moment it lands in the store (see openExampleStudy below), and nothing in
+ * the current app ever writes the older `'example'` tag into a live store --
+ * that value only ever arrives via an autosave written by a build that
+ * predates the `template` rename. Checking for `'example'` alone (as
+ * adoptExampleTemplate, ui/steps/guide.js and ui/walkthrough.js's "Use as
+ * template" all independently used to) is therefore a gate that can never
+ * open in the current app. Export this as the ONE place that rule lives --
+ * AUD-13 wires the same predicate into guide.js and walkthrough.js rather
+ * than growing a second copy of it.
+ */
+function isExampleOrigin(origin) {
+  return origin === 'example' || origin === 'template';
+}
+
+/**
+ * The thin wrapper around persist.loadMostRecentRecoverable that supplies the
+ * empty-study fallback -- persist.js deliberately doesn't know what a fresh
+ * study looks like, so `experiment: null` means "start fresh" here. Only
+ * fires when NO usable autosave exists at all (true first run, or every ring
+ * slot was corrupted); an existing in-progress study is never touched.
+ *
+ * `persist` is the injected bundle (see createAppController), not a direct
+ * import, so this stays importable and testable without a real
+ * localStorage-backed module.
+ */
+function resolveInitialExperiment(persist, createEmptyStudy, { onUnreadable } = {}) {
+  const { experiment, skippedCount, totalSaved } = persist.loadMostRecentRecoverable({ onUnreadable });
+  return {
+    experiment: experiment || createEmptyStudy(),
+    skippedCount,
+    totalSaved,
+    // `totalSaved` can be non-zero when every slot was unreadable. Only an
+    // experiment actually recovered from the ring justifies a saved claim.
+    isPersisted: Boolean(experiment),
+  };
+}
+
+/**
+ * @param {object} deps
+ * @param {object} deps.store - a core/store.js createStore() instance.
+ * @param {object} deps.persist - bundle of core/persist.js's exports this
+ *   controller needs: clearAll, deleteExperiment, exportToFile, importFromFile,
+ *   listSaved, loadExperiment, loadMostRecentRecoverable, loadRecoverableSlot,
+ *   markChanged, markExported, saveExperiment.
+ * @param {object} deps.guided - bundle of core/guidedProgress.js's transition
+ *   functions: load, start, resume, pause, advance, restart.
+ * @param {Array} deps.primaryWorkflow - engine/workflowProgress.js's PRIMARY_WORKFLOW.
+ * @param {() => object} deps.createExampleStudy - core/defaultStudy.js's createDefaultStudy.
+ * @param {() => object} deps.createEmptyStudy - core/schema.js's emptyExperiment.
+ * @param {boolean} [deps.isPersisted] - from resolveInitialExperiment's result;
+ *   seeds the initial save-state status.
+ * @param {{ setTimeout: Function, clearTimeout: Function }} [deps.timers]
+ * @param {() => string} [deps.now] - returns the ISO timestamp used for `savedAt`.
+ * @param {{ error: Function, warn: Function }} [deps.logger]
+ * @param {number} [deps.autosaveDebounceMs]
+ */
+function createAppController({
+  store,
+  persist,
+  guided,
+  primaryWorkflow,
+  createExampleStudy,
+  createEmptyStudy,
+  isPersisted = false,
+  timers = {
+    setTimeout: (...args) => window.setTimeout(...args),
+    clearTimeout: (...args) => window.clearTimeout(...args),
+  },
+  now = () => new Date().toISOString(),
+  logger = console,
+  autosaveDebounceMs = 500,
+} = {}) {
+  // Two-phase, same as main.js's pre-extraction pattern: every callback
+  // below may be constructed and handed to renderShell before the shell
+  // itself exists (renderShell needs the callbacks to build its buttons).
+  // `attachShell` is the explicit second phase -- every use of `shell` below
+  // is a guarded optional call for exactly that reason, not a defensive
+  // afterthought.
+  let shell = null;
+
+  function attachShell(nextShell) {
+    shell = nextShell;
+  }
+
+  function notifyToast(message) {
+    if (shell && typeof shell.showToast === 'function') shell.showToast(message);
+  }
+
+  function notifyRecoveryEntries() {
+    if (shell && typeof shell.setRecoveryEntries === 'function') shell.setRecoveryEntries(recoveryEntries());
+  }
+
+  let saveState = { status: isPersisted ? 'saved' : 'unsaved', savedAt: null, error: null };
+
+  function getSaveState() {
+    return saveState;
+  }
+
+  function setSaveState(next) {
+    saveState = { ...saveState, ...next };
+    if (shell && typeof shell.setSaveState === 'function') shell.setSaveState(saveState);
+  }
+
+  function reportStorageFailure() {
+    setSaveState({
+      status: 'failed',
+      error: 'Storage is full or unavailable. Export a project backup, then free space from Settings → Clear all stored data (or delete an old saved version from Restore).',
+    });
+  }
+
+  function reportPersistentLifecycleFailure(message) {
+    // The shell's save indicator is the one persistent lifecycle-status
+    // surface. A toast alone vanishes after three seconds, leaving an import
+    // or recovery failure indistinguishable from a successful no-op.
+    setSaveState({ status: 'failed', error: message });
+    notifyToast(message);
+  }
+
+  function recoveryEntries() {
+    // The shell receives display-only data, never a persistence backend. It
+    // therefore cannot accidentally load, mutate, or clear localStorage on
+    // its own; selected restores always come back through the callbacks
+    // below.
+    return persist.listSaved().map((id) => {
+      const raw = persist.loadExperiment(id);
+      const title = typeof raw?.meta?.title === 'string' && raw.meta.title.trim()
+        ? raw.meta.title.trim()
+        : 'Untitled study';
+      return { id, title };
+    });
+  }
+
+  function exportProjectBackup() {
+    persist.exportToFile(store.get(), projectFilename(store.get()));
+    persist.markExported({ onQuotaExceeded: reportStorageFailure });
+    notifyToast('Project backup downloaded.');
+  }
+
+  async function importProjectBackup(file) {
+    if (!file) return;
+    try {
+      const { experiment: imported, issues } = await persist.importFromFile(file);
+      store.replace(withOrigin(imported, 'imported'));
+      // replace() schedules the ordinary autosave subscriber. Clear any
+      // earlier lifecycle failure immediately; that subscriber will keep the
+      // status at saving, then replace it with saved or a storage failure.
+      setSaveState({ status: 'saving', error: null });
+      // core/importValidate.js sanitizes rather than rejects most shape
+      // problems (a malformed provenance slot, an assay reset to defaults)
+      // so the rest of a real backup is never thrown away over one bad
+      // corner -- but a sanitized field is exactly the kind of change a
+      // project owner needs to notice, not one that should vanish into the
+      // console alone.
+      if (Array.isArray(issues) && issues.length > 0) {
+        issues.forEach((issue) => logger.warn('Project import:', issue.message));
+        notifyToast(
+          `Project imported, but ${issues.length} part(s) of the file were invalid and reset to defaults. See the browser console for details.`
+        );
+      } else {
+        notifyToast('Project imported. It is now the study being autosaved.');
+      }
+    } catch (err) {
+      reportPersistentLifecycleFailure(
+        `Could not import that project: ${err && err.message ? err.message : 'invalid file'}`
+      );
+    }
+  }
+
+  function restoreRecoverySlot(id) {
+    const { experiment, error } = persist.loadRecoverableSlot(id, {
+      onUnreadable: (slotId, err) => logger.error(`Could not restore autosave ${slotId}:`, err),
+    });
+    if (!experiment) {
+      reportPersistentLifecycleFailure(
+        `Could not restore that version: ${error ? error.message : 'it is unavailable'}`
+      );
+      return false;
+    }
+    store.replace(experiment);
+    setSaveState({ status: 'saving', error: null });
+    notifyToast('Restored the selected previous version.');
+    return true;
+  }
+
+  // Storage is a CONVENIENCE, never the record of truth (see persist.js's
+  // header), but until now the only in-app escape from a full or corrupt
+  // ring was closing the tab and clearing browsing data by hand -- these two
+  // give quota-exhausted or otherwise stuck users a real exit that never
+  // requires leaving the app. Neither touches the study currently open in
+  // memory: deleting a saved slot only removes ONE ring entry; clearing
+  // storage wipes every ring slot and the change counter, but the live
+  // in-memory study survives and the very next autosave attempt (forced
+  // immediately below, so the save indicator does not keep reporting the
+  // just-cleared failure) writes it into the now-empty ring.
+  function deleteRecoverySlot(id) {
+    persist.deleteExperiment(id, { onQuotaExceeded: reportStorageFailure });
+    notifyRecoveryEntries();
+    notifyToast('Deleted that saved version.');
+  }
+
+  /**
+   * clearAll (AUD-01) returns { ok, removed, error } instead of silently
+   * doing its best -- a caller that cannot tell "actually cleared" from
+   * "silently did nothing" has no honest way to report success. This must
+   * show the success toast ONLY when both the clear AND the follow-up
+   * re-save of the currently open study succeeded; anything else reports
+   * the failure instead of erasing it, which is what this replaced (the
+   * old version fired the success toast unconditionally, and downgraded a
+   * failed re-save to `{ status: 'unsaved', error: null }` -- silently
+   * discarding the very error it should have surfaced).
+   */
+  function clearAllStoredData() {
+    const clearResult = persist.clearAll({ onQuotaExceeded: reportStorageFailure });
+    if (!clearResult.ok) {
+      reportPersistentLifecycleFailure(
+        `Could not clear stored data: ${clearResult.error && clearResult.error.message ? clearResult.error.message : 'storage is unavailable'}.`
+      );
+      return false;
+    }
+    const savedId = persist.saveExperiment(store.get(), { onQuotaExceeded: reportStorageFailure });
+    notifyRecoveryEntries();
+    if (!savedId) {
+      reportPersistentLifecycleFailure(
+        'Cleared stored data, but your open study could not be re-saved -- download a project backup so it is not lost if you reload.'
+      );
+      return false;
+    }
+    setSaveState({ status: 'saved', savedAt: now(), error: null });
+    notifyToast('Cleared all locally stored data. Your open study is unaffected, and saving has resumed.');
+    return true;
+  }
+
+  // Opening the example is an explicit request, so it arrives as ordinary
+  // editable work tagged `template` ("started from the example") rather than
+  // `example` ("the shipped seed, not yours"). Nothing has to be adopted,
+  // copied, or disowned before the visitor may type in it. `origin: 'example'`
+  // still exists in the schema so older autosaves keep loading unchanged.
+  function openExampleStudy() {
+    // Preserve the exact current state synchronously, before replace() can
+    // expose example data to the autosave subscriber. This snapshot is
+    // protected from normal ring eviction: browsing or editing demo data can
+    // never delete user-entered work. If durable preservation is unavailable,
+    // do not switch workspaces at all.
+    const protectedId = persist.saveExperiment(store.get(), {
+      onQuotaExceeded: reportStorageFailure,
+      protectFromAutomaticEviction: true,
+    });
+    if (!protectedId) {
+      reportPersistentLifecycleFailure(
+        'Could not preserve your current study, so the example was not opened. Download a project backup or free storage, then try again.'
+      );
+      return false;
+    }
+    const example = createExampleStudy();
+    store.replace(withOrigin(example, 'template'));
+    notifyRecoveryEntries();
+    notifyToast('Opened the example study. Your study was preserved in Restore and demo activity cannot remove it.');
+    return true;
+  }
+
+  /**
+   * Fixes the data-loss bug this task exists to close: `store.replace()`
+   * used to run while a pending 500ms autosave timer still held a closure
+   * over the ring-buffer write, so the timer fired AFTER the replace, read
+   * store.get() fresh, and persisted the new BLANK study into the ring
+   * instead of the edit the user had just made -- while
+   * ui/steps/settings.js's confirm dialog promises "Your current work
+   * remains available in Restore." Two changes close the window:
+   *   1. flushAutosave() cancels that pending timer and runs its save
+   *      synchronously, against the CURRENT (still edited) study, before
+   *      anything else happens.
+   *   2. The same protected-snapshot pattern openExampleStudy already uses
+   *      guarantees that edited study a slot immune to ring eviction, and
+   *      aborts the whole operation (never replaces the live study) if that
+   *      snapshot can't be taken.
+   */
+  function startBlankStudy() {
+    flushAutosave();
+    const protectedId = persist.saveExperiment(store.get(), {
+      onQuotaExceeded: reportStorageFailure,
+      protectFromAutomaticEviction: true,
+    });
+    if (!protectedId) {
+      reportPersistentLifecycleFailure(
+        'Could not preserve your current study, so a blank study was not started. Download a project backup or free storage, then try again.'
+      );
+      return false;
+    }
+    store.replace(createEmptyStudy());
+    notifyRecoveryEntries();
+    notifyToast('Started a blank study. Your previous versions remain available in Restore.');
+    return true;
+  }
+
+  function adoptExampleTemplate() {
+    if (!isExampleOrigin(store.get().meta?.origin)) return false;
+    store.patch((state) => ({ meta: { ...state.meta, origin: 'template' } }));
+    return true;
+  }
+
+  let guidedStorageFailureAnnounced = false;
+  function reportGuidedStorageFailure(error) {
+    logger.error('Could not persist guided walkthrough progress:', error);
+    // Guarded rather than calling shell.showToast unconditionally: this can
+    // fire before `attachShell` has ever run (the initial guided.load call
+    // below runs at construction time, ahead of renderShell), and
+    // repeatedly on every step transition once storage is broken --
+    // announce the failure once, the first time a toast surface is
+    // actually available.
+    if (guidedStorageFailureAnnounced || !shell || typeof shell.showToast !== 'function') return;
+    guidedStorageFailureAnnounced = true;
+    shell.showToast('Walkthrough progress could not be saved — it will restart if you reload.');
+  }
+
+  let guidedProgressState = guided.load(primaryWorkflow, { onError: reportGuidedStorageFailure });
+
+  function getGuidedState() {
+    return guidedProgressState;
+  }
+
+  function applyGuidedTransition(transition, options = {}) {
+    guidedProgressState = transition(primaryWorkflow, {
+      ...options,
+      state: guidedProgressState,
+      onError: reportGuidedStorageFailure,
+    });
+    return guidedProgressState;
+  }
+
+  const guidedTransitions = {
+    start: () => applyGuidedTransition(guided.start),
+    resume: () => applyGuidedTransition(guided.resume),
+    pause: () => applyGuidedTransition(guided.pause),
+    advance: (stepId) => applyGuidedTransition(guided.advance, { fromStepId: stepId }),
+    restart: () => applyGuidedTransition(guided.restart),
+  };
+
+  // Debounced: saving on every keystroke would fill the 5-slot ring buffer
+  // with near-duplicate snapshots of the last few characters typed, rather
+  // than the last 5 genuinely distinct states the ring buffer exists to
+  // preserve as history.
+  let saveTimer = null;
+
+  function performAutosave() {
+    const savedId = persist.saveExperiment(store.get(), { onQuotaExceeded: reportStorageFailure });
+    if (savedId) {
+      setSaveState({ status: 'saved', savedAt: now(), error: null });
+      notifyRecoveryEntries();
+    } else {
+      reportStorageFailure();
+    }
+  }
+
+  /**
+   * Cancel a pending debounced autosave and run it immediately, against
+   * whatever store.get() currently holds. A no-op when nothing is pending.
+   * This is what makes startBlankStudy (above) safe: called before
+   * store.replace(), it guarantees the edit sitting in the timer's closure
+   * is the one that gets persisted, not whatever replaces it next.
+   */
+  function flushAutosave() {
+    if (saveTimer === null) return;
+    timers.clearTimeout(saveTimer);
+    saveTimer = null;
+    performAutosave();
+  }
+
+  function startAutosave() {
+    return store.subscribe(() => {
+      setSaveState({ status: 'saving', error: null });
+      // Run after the state transition: if this bookkeeping write fails, its
+      // visible failed state must not be overwritten immediately by "saving".
+      persist.markChanged({ onQuotaExceeded: reportStorageFailure });
+      if (saveTimer !== null) timers.clearTimeout(saveTimer);
+      saveTimer = timers.setTimeout(() => {
+        saveTimer = null;
+        performAutosave();
+      }, autosaveDebounceMs);
+    });
+  }
+
+  // These lifecycle actions replace the in-memory root and deliberately
+  // leave the five prior recovery slots intact. That makes a mistaken reset
+  // recoverable instead of making a "start over" action a data-loss trap.
+  // Spread this same object into both renderShell's options and every
+  // step's render() options (main.js) -- shared names, single source.
+  const actions = {
+    onReset: openExampleStudy,
+    onNewBlank: startBlankStudy,
+    onAdoptExample: adoptExampleTemplate,
+    onOpenExample: openExampleStudy,
+    onExportProject: exportProjectBackup,
+    onImportProject: importProjectBackup,
+    onRestoreRecovery: restoreRecoverySlot,
+    onDeleteRecovery: deleteRecoverySlot,
+    onClearAllStorage: clearAllStoredData,
+  };
+
+  return {
+    attachShell,
+    actions,
+    guidedTransitions,
+    getGuidedState,
+    getSaveState,
+    recoveryEntries,
+    startAutosave,
+    flushAutosave,
+  };
+}
   // ---- src/core/assay.js ----
 // The assay tier (schema v3): a study holds many assays, each an almost-
 // complete v2 Experiment slice (specimen/design/panel/acquisition/controls/
@@ -5366,15 +5866,12 @@ globalThis.__MICRONAUT_KB__ = {"advisor":{"rules":[{"body":"The depletion beam d
 const ASSAY_SCOPED_ROOTS = new Set(['specimen', 'design', 'panel', 'acquisition', 'controls', 'timing']);
 
 // Scalar fields that live DIRECTLY on the assay object rather than inside one
-// of the container roots above -- 'label' (commit 2's rename), 'readout'/
-// 'readoutText' (reserved on emptyAssay below for commit 3, not yet wired
-// into assayView). Without this set, scopeWrite('label', assayId) falls
-// through isAssayScopedPath as study-level and writes into a PHANTOM
-// experiment.label at the study root -- setPath auto-vivifies a missing root
-// on write with no error, exactly the hazard this module's header warns
-// about, just for a path shape commit 1 never had to write to. Solved for all
-// three scalar fields now so commit 3 does not have to revisit this
-// predicate a second time.
+// of the container roots above: 'label', 'readout', 'readoutText'. Without
+// this set, scopeWrite('label', assayId) falls through isAssayScopedPath as
+// study-level and writes into a PHANTOM experiment.label at the study root --
+// setPath auto-vivifies a missing root on write with no error, exactly the
+// hazard this module's header warns about. All three scalar fields are
+// covered here so scopeWrite never has to revisit this predicate.
 const ASSAY_SCALAR_FIELDS = new Set(['label', 'readout', 'readoutText']);
 
 // Matches the bare container ('naming.fields' itself, e.g. a future bulk
@@ -5406,10 +5903,9 @@ function emptyAssay(id) {
   return {
     id,
     label: '',
-    // readout/readoutText and the controls tier that reads them are
-    // deliberately NOT wired into assayView below -- commit 1 (this module)
-    // ships before web/kb/readouts.json exists. The fields are real schema,
-    // just not yet consumed anywhere.
+    // readout/readoutText: real schema fields, wired into assayView below
+    // and consumed by engine/experimentMap.js and the controls tier
+    // (web/kb/readouts.json) that reads them.
     readout: '',
     readoutText: '',
     specimen: { organism: '', sampleType: '', preparation: '', notes: '' },
@@ -5517,9 +6013,7 @@ function projectProvenance(provenance, assayId) {
  * emptyExperiment() without a matching line here is a visible gap in this
  * function, not a silent leak through a spread.
  *
- * `readout`/`readoutText` are wired in as of commit 3 (web/kb/readouts.json,
- * engine/controls.js) -- commit 1's header comment said these were
- * deliberately NOT included yet; they are now, verbatim from the assay, no
+ * `readout`/`readoutText` are passed through verbatim from the assay, no
  * KB logic here (this module stays a leaf; canonicalization happens in
  * ui/steps/describe.js at answer time, where the readouts KB is available).
  *
@@ -6743,7 +7237,17 @@ function readRing(storage) {
 }
 
 function defaultBackend() {
-  return typeof globalThis !== 'undefined' ? globalThis.localStorage : undefined;
+  // Privacy-mode browsers can make globalThis.localStorage THROW on access
+  // (not merely return undefined), and this is a default parameter of every
+  // exported function below -- it runs before any internal try/catch, so an
+  // unguarded read here would escape past all of them and white-screen the
+  // app at startup. Pattern mirrors core/guidedProgress.js's
+  // guidedProgressBackend().
+  try {
+    return typeof globalThis !== 'undefined' ? globalThis.localStorage : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function readJSON(storage, key, fallback) {
@@ -6770,12 +7274,20 @@ function writeJSON(storage, key, value, onQuotaExceeded) {
   }
 }
 
+// Returns whether the key is actually gone. Callers that report success to a
+// user (clearAll -> main's "Cleared all locally stored data" toast) cannot
+// tell a real deletion from a suppressed failure otherwise -- removeItem can
+// throw on a backend this module does not control, and a silently swallowed
+// throw is how "all your data is cleared" gets said over data that is still
+// there.
 function removeKey(storage, key, onQuotaExceeded) {
-  if (!storage) return;
+  if (!storage) return false;
   try {
     storage.removeItem(key);
+    return true;
   } catch (err) {
     if (onQuotaExceeded) onQuotaExceeded(err);
+    return false;
   }
 }
 
@@ -6915,21 +7427,52 @@ function deleteExperiment(id, { storage = defaultBackend(), onQuotaExceeded } = 
  * an index-driven sweep and then be picked up by the next listSaved() -- a
  * "start over" that silently restores the old experiment is worse than none.
  * Foreign keys sharing the same storage are left untouched.
+ *
+ * Returns an explicit result -- { ok, removed, error } -- instead of
+ * undefined: storage.length/storage.key(i) below are unguarded reads into a
+ * backend this module does not control (a privacy-mode browser, a hostile or
+ * incomplete Storage shim), and a caller that cannot tell "actually cleared"
+ * from "silently did nothing" has no honest way to report success to the
+ * user. `removed` lists the STORAGE_PREFIX keys this call attempted to
+ * delete (empty on failure); `error` is the caught exception on failure,
+ * otherwise null.
  */
 function clearAll({ storage = defaultBackend(), onQuotaExceeded } = {}) {
-  if (!storage) return;
+  if (!storage) {
+    return { ok: false, removed: [], error: new Error('No storage backend is available.') };
+  }
   const doomed = [];
-  for (let i = 0; i < storage.length; i += 1) {
-    const key = storage.key(i);
-    if (typeof key === 'string' && key.startsWith(STORAGE_PREFIX)) {
-      doomed.push(key);
+  try {
+    for (let i = 0; i < storage.length; i += 1) {
+      const key = storage.key(i);
+      if (typeof key === 'string' && key.startsWith(STORAGE_PREFIX)) {
+        doomed.push(key);
+      }
     }
+  } catch (err) {
+    return { ok: false, removed: [], error: err };
   }
   // Collect first, delete second: removing while iterating by index reindexes
   // the remaining keys and silently skips every other one.
+  //
+  // Keep going after a failed delete rather than bailing on the first one: a
+  // partial clear is still worth completing, and `removed` then reports what
+  // genuinely went. `ok` is false if ANY key survived, so a caller can never
+  // announce a clear that did not happen.
+  const removed = [];
+  const failed = [];
   for (const key of doomed) {
-    removeKey(storage, key, onQuotaExceeded);
+    if (removeKey(storage, key, onQuotaExceeded)) removed.push(key);
+    else failed.push(key);
   }
+  if (failed.length > 0) {
+    return {
+      ok: false,
+      removed,
+      error: new Error(`Could not remove ${failed.length} stored key(s): ${failed.join(', ')}`),
+    };
+  }
+  return { ok: true, removed, error: null };
 }
 
 function markChanged({ storage = defaultBackend(), onQuotaExceeded } = {}) {
@@ -8853,8 +9396,17 @@ function effectiveReplicateCount(raw) {
   return 1; // an explicit-but-invalid value still expands (as 1 row); flagged separately
 }
 
-/** Total row count a design would expand to, without building any rows. */
-function plannedRowCount(design) {
+/**
+ * Total row count a design would expand to, without building any rows.
+ *
+ * `{ includeTechnicalReplicates }` (default true) controls whether the
+ * technical-replicate axis is folded into the total. A technical replicate is
+ * a repeat MEASUREMENT of the same physical sample (web/kb/questions.json's
+ * timing/technicalReplicates question), not a second physical specimen -- so
+ * counting it multiplies FILES/acquisition runs, not physical samples. See
+ * physicalSampleCount below for the samples-only total.
+ */
+function plannedRowCount(design, { includeTechnicalReplicates = true } = {}) {
   const factors = factorsOf(design);
   const groupLevels = groupLevelsOf(design);
   let total = Math.max(groupLevels.length, 1); // 0 group levels -> a design with no groups defined yet
@@ -8862,8 +9414,27 @@ function plannedRowCount(design) {
     total *= levelsOf(factor).length;
   }
   total *= effectiveReplicateCount(design && design.biologicalReplicates) ?? 1;
-  total *= effectiveReplicateCount(design && design.technicalReplicates) ?? 1;
+  if (includeTechnicalReplicates) {
+    total *= effectiveReplicateCount(design && design.technicalReplicates) ?? 1;
+  }
   return total;
+}
+
+/**
+ * Total PHYSICAL SAMPLE count a design implies: groups x factors x
+ * biological replicates, deliberately EXCLUDING the technical-replicate axis.
+ * A technical replicate is a repeat measurement of the same physical sample,
+ * not a second one -- so this is the count a bench operation that touches
+ * the physical specimen (e.g. mounting a slide) should scale by, as opposed
+ * to `planFilenames(...).length` / plannedRowCount's full row count, which
+ * also counts repeat acquisitions of that same sample.
+ *
+ * Total on malformed/absent design input, like its sibling plannedRowCount:
+ * never throws, degrades via the same factorsOf/groupLevelsOf/
+ * effectiveReplicateCount guards.
+ */
+function physicalSampleCount(design) {
+  return plannedRowCount(design, { includeTechnicalReplicates: false });
 }
 
 /** Extract the `{token}` names referenced by a template string, in order. */
@@ -12682,39 +13253,104 @@ function shapeAppKb(raw) {
   };
 }
   // ---- src/engine/measurementStatus.js ----
-// The ONE user-facing status vocabulary for a measurement.
+// A measurement's status, honestly split into the three questions that used
+// to be crammed into one word.
 //
-// Four engines already describe how finished a study is, each with its own
-// words and its own good reason to exist: workflowProgress (per-route
-// completion), conformance (the export gate), decisionTriage (when a gap
-// matters), and experimentMap (orientation state). They all stay. What changed
-// is that the researcher no longer meets four vocabularies at once -- the
-// registry row and the measurement header show one badge, and this module is
-// the single place the mapping lives.
+// Three engines already describe how finished a measurement is, each
+// answering a different question: experimentMap (is it even DEFINED),
+// decisionTriage (does its PLAN still have an open decision), and conformance
+// (do its export CHECKS pass). This module does not replace any of them --
+// it reads their existing outputs and reports each answer on its own scoped
+// axis, rather than collapsing all three into a single ready/not-ready word.
 //
-// Deliberately three words, in the register of a project tracker rather than a
-// grading scheme:
+//   definition   draft | provisional | defined       <- measurement.state alone
+//   plan         open | needs-decision | ready        <- triage items this measurement owns
+//   conformance  not-checked | blocked | needs-review | passes  <- conformance.assays[i].readiness, verbatim
 //
-//   draft            nothing consequential decided yet
-//   needs-decision   something is open, or a validator is unhappy
-//   ready            every planner check this measurement owns is satisfied
+// `plan` cannot be judged before the measurement is `defined`: it reads
+// `open` until then, regardless of triage. Once defined, it is
+// `needs-decision` while some triage item this measurement owns is still
+// open, else `ready`. "Ready to acquire" is the label of plan:ready and of
+// nothing else -- it describes the plan's completeness, never the science,
+// and never the export gate (that is conformance's job, and conformance
+// already owns issue severity; this module reads its verdict verbatim and
+// never re-derives it).
 //
-// "ready" is scoped honestly: it means the planner's known requirements are
-// met, never that the experiment is correct, powered, or approved. The label
-// says "Ready to acquire" for exactly that reason -- it describes the plan's
-// completeness, not the science.
+// `headline` is the first of the three axes (in the fixed order
+// definition -> plan -> conformance) that is not already at its best status;
+// if all three are, the headline is conformance:passes. `tone` is the
+// headline's tone, one of ok | attention | progress | neutral, for a
+// consumer that wants a single colour without reimplementing this ordering.
 //
-// Pure and TOTAL: malformed input degrades to `draft`, never throws.
+// Pure and TOTAL: malformed input degrades to the all-lowest record
+// (headline definition:draft), never throws.
 
-const MEASUREMENT_STATUSES = Object.freeze(['draft', 'needs-decision', 'ready']);
+const MEASUREMENT_STATUS_SCOPES = Object.freeze(['definition', 'plan', 'conformance']);
 
-const BLOCKING_ISSUE_SEVERITIES = new Set(['error', 'fatal']);
+const MEASUREMENT_STATUS_STATUSES = Object.freeze({
+  definition: Object.freeze(['draft', 'provisional', 'defined']),
+  plan: Object.freeze(['open', 'needs-decision', 'ready']),
+  conformance: Object.freeze(['not-checked', 'blocked', 'needs-review', 'passes']),
+});
+
+const MEASUREMENT_STATUS_TOP = Object.freeze({ definition: 'defined', plan: 'ready', conformance: 'passes' });
+
+const MEASUREMENT_STATUS_SCOPE_TITLES = Object.freeze({
+  definition: 'Definition',
+  plan: 'Plan',
+  conformance: 'Conformance',
+});
 
 const MEASUREMENT_STATUS_LABELS = Object.freeze({
-  draft: 'Draft',
-  'needs-decision': 'Needs a decision',
-  ready: 'Ready to acquire',
+  definition: Object.freeze({
+    draft: 'Draft',
+    provisional: 'Provisionally defined',
+    defined: 'Defined',
+  }),
+  plan: Object.freeze({
+    open: 'Plan open',
+    'needs-decision': 'Needs a decision',
+    ready: 'Ready to acquire',
+  }),
+  conformance: Object.freeze({
+    'not-checked': 'Not checked',
+    blocked: 'Blocked',
+    'needs-review': 'Needs review',
+    passes: 'Checks pass',
+  }),
 });
+
+const MEASUREMENT_STATUS_TONES = Object.freeze({
+  definition: Object.freeze({ draft: 'neutral', provisional: 'progress', defined: 'ok' }),
+  plan: Object.freeze({ open: 'neutral', 'needs-decision': 'attention', ready: 'ok' }),
+  conformance: Object.freeze({
+    'not-checked': 'neutral',
+    blocked: 'attention',
+    'needs-review': 'progress',
+    passes: 'ok',
+  }),
+});
+
+// Only triage items that OWN this measurement in the planner's own sense
+// count against the plan axis: `source === 'map'` items whose tier is
+// measurement-design or before-acquisition, keyed by `measurementId`.
+// `source === 'conformance'` items (engine/decisionTriage.js conformanceItems)
+// key themselves by `assayId`, not `measurementId`, and belong solely to the
+// conformance axis -- matching `assayId` here as a fallback would re-import
+// conformance issues into the plan scope and rebuild the double-reporting
+// this split exists to end. `later` stays ignored, as it always has.
+const MEASUREMENT_STATUS_PLAN_TIERS = new Set(['measurement-design', 'before-acquisition']);
+
+const MEASUREMENT_STATUS_FILTERS = Object.freeze(
+  MEASUREMENT_STATUS_SCOPES.flatMap((scope) =>
+    MEASUREMENT_STATUS_STATUSES[scope].map((status) =>
+      Object.freeze({
+        value: `${scope}:${status}`,
+        label: `${MEASUREMENT_STATUS_SCOPE_TITLES[scope]}: ${MEASUREMENT_STATUS_LABELS[scope][status]}`,
+      })
+    )
+  )
+);
 
 function measurementStatusRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -12724,55 +13360,96 @@ function measurementStatusText(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function measurementStatusDefinition(state) {
+  if (state === 'answered') return 'defined';
+  if (state === 'provisional') return 'provisional';
+  // `missing` and anything else (including the dead `needs-attention` value
+  // experimentMap.measurementState never actually emits) fold into `draft`.
+  return 'draft';
+}
+
+function measurementStatusPlanNeedsDecision(id, decisions) {
+  const groups = measurementStatusRecord(decisions).groups;
+  if (!Array.isArray(groups)) return false;
+  for (const group of groups) {
+    const safeGroup = measurementStatusRecord(group);
+    if (!MEASUREMENT_STATUS_PLAN_TIERS.has(measurementStatusText(safeGroup.tier))) continue;
+    const items = safeGroup.items;
+    if (!Array.isArray(items)) continue;
+    for (const item of items) {
+      const safeItem = measurementStatusRecord(item);
+      if (safeItem.source !== 'map') continue;
+      if (measurementStatusText(safeItem.measurementId) === id) return true;
+    }
+  }
+  return false;
+}
+
+function measurementStatusPlan(id, definition, decisions) {
+  // The plan cannot be judged before the measurement exists.
+  if (definition !== 'defined') return 'open';
+  if (id && measurementStatusPlanNeedsDecision(id, decisions)) return 'needs-decision';
+  return 'ready';
+}
+
+function measurementStatusConformance(id, conformance) {
+  if (!id) return 'not-checked';
+  const assays = measurementStatusRecord(conformance).assays;
+  if (!Array.isArray(assays)) return 'not-checked';
+  const report = assays.find((entry) => measurementStatusText(measurementStatusRecord(entry).id) === id);
+  if (!report) return 'not-checked';
+  // Read `readiness` verbatim -- conformance is the sole authority on issue
+  // severity; this module never re-derives it.
+  const readiness = measurementStatusRecord(report).readiness;
+  if (readiness === 'blocked') return 'blocked';
+  if (readiness === 'needs-review') return 'needs-review';
+  if (readiness === 'ready') return 'passes';
+  return 'not-checked';
+}
+
+function measurementStatusHeadline(record) {
+  for (const scope of MEASUREMENT_STATUS_SCOPES) {
+    if (record[scope] !== MEASUREMENT_STATUS_TOP[scope]) return { scope, status: record[scope] };
+  }
+  return { scope: 'conformance', status: 'passes' };
+}
+
+function measurementStatusToneFor(scope, status) {
+  const scoped = MEASUREMENT_STATUS_TONES[scope];
+  return (scoped && scoped[status]) || 'neutral';
+}
+
 /**
  * `measurement` is one entry from buildExperimentMap(...).measurements.
- * `decisions` is an optional decisionTriage(...) result; when supplied, any
- * open decision owning this measurement forces `needs-decision`.
- * `conformance` is an optional checkConformance(...) report; a blocking issue
- * against this measurement likewise forces `needs-decision`.
+ * `decisions` is an optional decisionTriage(...) result; a `source: 'map'`
+ * item in a measurement-design or before-acquisition group, owning this
+ * measurement's id, demotes the plan axis to `needs-decision`.
+ * `conformance` is an optional checkConformance(...) report; this
+ * measurement's `conformance.assays[i].readiness` (if present) becomes the
+ * conformance axis verbatim.
+ *
+ * Returns a frozen `{ definition, plan, conformance, headline: { scope,
+ * status }, tone }` record. Total: never throws on malformed input.
  */
 function measurementStatus(measurement, { decisions, conformance } = {}) {
   const safe = measurementStatusRecord(measurement);
   const id = measurementStatusText(safe.id);
 
-  // experimentMap already decided this measurement needs attention.
-  if (safe.state === 'needs-attention') return 'needs-decision';
+  const definition = measurementStatusDefinition(safe.state);
+  const plan = measurementStatusPlan(id, definition, decisions);
+  const conformanceStatus = measurementStatusConformance(id, conformance);
 
-  if (id) {
-    const groups = measurementStatusRecord(decisions).groups;
-    if (Array.isArray(groups)) {
-      for (const group of groups) {
-        const tier = measurementStatusText(measurementStatusRecord(group).tier);
-        // A value that may truthfully wait (a date, an instrument label) is not
-        // a reason to tell someone their measurement is unfinished.
-        if (tier === 'later') continue;
-        const items = measurementStatusRecord(group).items;
-        if (!Array.isArray(items)) continue;
-        if (items.some((item) => measurementStatusText(measurementStatusRecord(item).measurementId) === id)) return 'needs-decision';
-      }
-    }
+  const record = { definition, plan, conformance: conformanceStatus };
+  const headline = Object.freeze(measurementStatusHeadline(record));
+  const tone = measurementStatusToneFor(headline.scope, headline.status);
 
-    const assayReports = measurementStatusRecord(conformance).assays;
-    if (Array.isArray(assayReports)) {
-      const report = assayReports.find((entry) => measurementStatusText(measurementStatusRecord(entry).id) === id);
-      const issues = measurementStatusRecord(report).issues;
-      // Same two severities conformance itself counts as blocking
-      // (BLOCKING_SEVERITIES in engine/conformance.js). This module reads that
-      // verdict; it never re-decides it, so the export gate stays the one
-      // authority on whether an artifact may leave.
-      if (Array.isArray(issues) && issues.some((issue) => BLOCKING_ISSUE_SEVERITIES.has(measurementStatusRecord(issue).severity))) {
-        return 'needs-decision';
-      }
-    }
-  }
-
-  // Nothing is open. `answered` from the map means this measurement has both
-  // its identity and its design settled; anything less is still a draft.
-  return safe.state === 'answered' ? 'ready' : 'draft';
+  return Object.freeze({ ...record, headline, tone });
 }
 
-function measurementStatusLabel(status) {
-  return MEASUREMENT_STATUS_LABELS[status] || MEASUREMENT_STATUS_LABELS.draft;
+function measurementStatusLabel(scope, status) {
+  const scoped = MEASUREMENT_STATUS_LABELS[scope];
+  const label = scoped && scoped[status];
+  return label || MEASUREMENT_STATUS_LABELS.definition.draft;
 }
   // ---- src/engine/namingConfig.js ----
 // NAMING_CONFIG / BASE_TEMPLATE: the naming-template constants shared by
@@ -13478,27 +14155,42 @@ function icsEvent(event, now) {
  * time" are different facts and must not collapse into the same output.
  *
  * Mounting and acquisition are PER-SAMPLE ETAs (the question bank's own
- * wording): each is multiplied by `sampleCount` into one combined block --
- * a calendar app gains nothing from 40 separate 10-minute mounting events
- * where "about 6.5 hours of mounting" says the same thing more usefully.
- * `sampleCount` is clamped to at least 1 so a design with zero planned
- * conditions (an unanswered/broken design, per engine/plan.js) still
- * produces one worked block instead of a schedule that silently vanishes.
+ * wording), but they do NOT scale by the same count. Mounting is a physical-
+ * slide operation: it happens once per physical SAMPLE, so it is multiplied
+ * by `sampleCount`. Acquisition is a repeat MEASUREMENT of that same mounted
+ * sample -- a technical replicate, by definition, re-acquires without
+ * re-mounting (web/kb/questions.json's technicalReplicates question) -- so it
+ * is multiplied by `acquisitionRunCount`, which defaults to `sampleCount` when
+ * the caller doesn't distinguish the two (every existing caller/test). Each
+ * total becomes one combined block -- a calendar app gains nothing from 40
+ * separate 10-minute mounting events where "about 6.5 hours of mounting" says
+ * the same thing more usefully. Both counts are independently clamped to at
+ * least 1 so a design with zero planned conditions (an unanswered/broken
+ * design, per engine/plan.js) still produces one worked block instead of a
+ * schedule that silently vanishes.
  *
  * Pure, deterministic: returns `{uid, summary, description, start, minutes}`
  * objects, not iCalendar text -- renderIcs (below) is the one place that
  * text format is produced, so a future second consumer (the deferred Google
  * Calendar sync) can build its own events from the exact same list.
  */
-function buildIcsSchedule({ assayLabel, timing, sampleCount, startDate }) {
+function buildIcsSchedule({
+  assayLabel,
+  timing,
+  sampleCount,
+  acquisitionRunCount = sampleCount,
+  startDate,
+}) {
   const t = timing && typeof timing === 'object' ? timing : {};
-  const count = Number.isFinite(sampleCount) && sampleCount > 0 ? Math.floor(sampleCount) : 1;
+  const clampCount = (value) => (Number.isFinite(value) && value > 0 ? Math.floor(value) : 1);
+  const count = clampCount(sampleCount);
+  const runCount = clampCount(acquisitionRunCount);
   const label = typeof assayLabel === 'string' && assayLabel.trim() ? assayLabel.trim() : 'This assay';
   const start = startDate instanceof Date && !Number.isNaN(startDate.getTime()) ? startDate : new Date();
 
-  const perSample = (minutesPerSample) =>
-    typeof minutesPerSample === 'number' && Number.isFinite(minutesPerSample) && minutesPerSample > 0
-      ? minutesPerSample * count
+  const scaledMinutes = (minutesPerUnit, units) =>
+    typeof minutesPerUnit === 'number' && Number.isFinite(minutesPerUnit) && minutesPerUnit > 0
+      ? minutesPerUnit * units
       : null;
 
   const stagesInOrder = [
@@ -13510,15 +14202,15 @@ function buildIcsSchedule({ assayLabel, timing, sampleCount, startDate }) {
     },
     {
       key: 'mounting',
-      minutes: perSample(t.etaMountingMinutes),
+      minutes: scaledMinutes(t.etaMountingMinutes, count),
       summary: `${label}: Mounting (${count} sample${count === 1 ? '' : 's'})`,
       description: `Mounting, ${t.etaMountingMinutes} min/sample × ${count} sample(s).`,
     },
     {
       key: 'acquisition',
-      minutes: perSample(t.etaAcquisitionMinutes),
-      summary: `${label}: Microscope acquisition (${count} sample${count === 1 ? '' : 's'})`,
-      description: `Acquisition, ${t.etaAcquisitionMinutes} min/sample × ${count} sample(s).`,
+      minutes: scaledMinutes(t.etaAcquisitionMinutes, runCount),
+      summary: `${label}: Microscope acquisition (${runCount} run${runCount === 1 ? '' : 's'})`,
+      description: `Acquisition, ${t.etaAcquisitionMinutes} min/run × ${runCount} run(s).`,
     },
     {
       key: 'analysis',
@@ -14420,6 +15112,13 @@ function anyAssayHasGroups(assays) {
 function studyProgress(experiment, conformance, assays) {
   const hasResearchQuestion = hasValue(experiment && experiment.researchQuestion);
   const hasGroups = anyAssayHasGroups(assays);
+  // An explicit observational choice makes an empty group axis intentional
+  // (see core/schema.js's STUDY_COMPARISON_MODES comment), so only require
+  // group levels when the study has NOT explicitly opted out of them. The
+  // 'not-decided' default is deliberately left requiring groups, exactly as
+  // before this gate existed.
+  const comparisonMode = experiment && experiment.studyContext && experiment.studyContext.comparisonMode;
+  const groupsSatisfied = comparisonMode === 'observational' ? true : hasGroups;
   const allAssaysHaveContent = assays.length > 0 && assays.every(hasAssayContent);
   const crossAssayIssues = Array.isArray(conformance && conformance.crossAssayIssues)
     ? conformance.crossAssayIssues
@@ -14429,7 +15128,7 @@ function studyProgress(experiment, conformance, assays) {
   // so consume its existing output rather than rerunning studyNameIssues or
   // trying to reinterpret severities here.
   if (crossAssayIssues.length > 0) return 'needs-attention';
-  if (hasResearchQuestion && hasGroups && allAssaysHaveContent) return 'complete';
+  if (hasResearchQuestion && groupsSatisfied && allAssaysHaveContent) return 'complete';
   if (hasResearchQuestion || hasGroups || assays.some(hasAssayContent)) return 'in-progress';
   return 'not-started';
 }
@@ -14476,10 +15175,22 @@ function reportForAssay(conformance, assayId) {
  * contribute to the summary. Per-assay `overview` consumes conformance's
  * `readiness` verbatim, and the study Overview mirrors the whole-study
  * readiness verbatim.
+ *
+ * This is also the one place each measurement's scoped status record is
+ * computed: `decisionTriage(map, conformance)` runs exactly once here, and
+ * each per-assay entry's `status` field is `measurementStatus(...)` for that
+ * assay's `map.measurements` entry, given that shared triage and the same
+ * conformance report. Consumers (the switcher pill, the Measurements
+ * registry, the Measurement header) must read `assays[i].status` rather than
+ * re-running `checkConformance` or `decisionTriage` per render.
  */
 function deriveWorkflowProgress(experiment, conformance, questions = []) {
   const exp = experiment && typeof experiment === 'object' ? experiment : {};
   const map = buildExperimentMap(exp, { conformance });
+  const triage = decisionTriage(map, conformance);
+  const measurementsById = new Map(
+    (Array.isArray(map.measurements) ? map.measurements : []).map((measurement) => [measurement.id, measurement])
+  );
   const assays = Array.isArray(exp.assays) ? exp.assays : [];
   const perAssay = assays.map((assay, index) => {
     const view = assayView(exp, assay && assay.id);
@@ -14496,12 +15207,19 @@ function deriveWorkflowProgress(experiment, conformance, questions = []) {
     // guided walkthrough and the per-assay tree still speak about them by name.
     const measurement = { state: aggregate([design.state, microscopy.state, naming.state]) };
 
+    // `status` is the scoped { definition, plan, conformance } record for
+    // this assay's own map measurement. An assay id absent from the map (it
+    // should always be present, but this module is total) still gets
+    // measurementStatus's all-lowest fallback record rather than throwing.
+    const status = measurementStatus(measurementsById.get(assay && assay.id), { decisions: triage, conformance });
+
     return {
       id: assay && assay.id,
       label: (assay && assay.label) || `Assay ${index + 1}`,
       readiness: report && report.readiness,
       steps: { project, design, microscopy, naming, measurement, overview },
       state: aggregate([project.state, design.state, microscopy.state, naming.state, overview.state]),
+      status,
     };
   });
 
@@ -15120,6 +15838,17 @@ function createIcon(name, className) {
 // this module only renders those contracts and routes user actions back out.
 
 
+// Maps a measurement status record's `tone` onto the switcher pill's existing
+// badge classes (app.css:2947-2954), so the pill and the Measurements
+// registry -- both readers of workflowProgress.assays[i].status -- share one
+// vocabulary instead of the pill speaking the retired route-state words.
+const MEASUREMENT_TONE_CLASS = Object.freeze({
+  ok: 'is-complete',
+  attention: 'is-needs-attention',
+  progress: 'is-in-progress',
+  neutral: 'is-not-started',
+});
+
 const THEME_KEY = 'micronaut.theme';
 const NAV_COLLAPSED_KEY = 'micronaut.navCollapsed';
 
@@ -15150,6 +15879,37 @@ function saveLabel(saveState) {
   if (seconds < 10) return 'Saved locally · just now';
   if (seconds < 60) return `Saved locally · ${seconds}s ago`;
   return `Saved locally · ${Math.round(seconds / 60)}m ago`;
+}
+
+// `steps` is router.steps (every route, including the utility/guide ones);
+// 'guide' is the one non-utility route excluded from the primary workflow
+// (see engine/workflowProgress.js's PRIMARY_WORKFLOW/OPTIONAL_WORKFLOW
+// split). A route inside that primary set gets its ordinal position; any
+// other route (Settings, Feedback, Guide) names itself via its own `title`
+// instead of every one of them claiming to be "Guide (optional)".
+function footerPositionLabel(steps, activeId) {
+  const safeSteps = Array.isArray(steps) ? steps : [];
+  const primary = safeSteps.filter((step) => step && step.id !== 'guide' && !step.utility);
+  const index = primary.findIndex((step) => step.id === activeId);
+  if (index !== -1) return `Step ${index + 1} of ${primary.length}`;
+  const active = safeSteps.find((step) => step && step.id === activeId);
+  return (active && typeof active.title === 'string' && active.title) || 'Guide (optional)';
+}
+
+// Research brief (`describe`) writes a study-wide narrative whose
+// suggestions merely TARGET the active measurement, so it earns its own
+// non-editing-of-that-measurement phrasing; Review (`overview`) is read-only
+// and must never claim to be "editing" anything. Every other route
+// (including `measurement`, which really is being edited) keeps the original
+// "Now editing" phrasing. Always resolves to a complete phrase -- never a
+// bare "Now editing: " -- because both branches that need a measurement name
+// fall back to a literal default instead of an empty label.
+function compassScopeLine(routeId, measurementLabel) {
+  const label = typeof measurementLabel === 'string' && measurementLabel.trim() ? measurementLabel.trim() : 'Not selected';
+  if (routeId === 'describe') return `Suggestions target: ${label}`;
+  if (routeId === 'measurement') return `Now editing: Measurement: ${label}`;
+  if (routeId === 'overview') return 'Reviewing: Whole study';
+  return 'Now editing: Whole study';
 }
 
 function renderShell(root, store, router, options = {}) {
@@ -15436,8 +16196,15 @@ function renderShell(root, store, router, options = {}) {
   function workflowStep(routeId) {
     return primarySteps().find((step) => step.id === workflowForRoute(routeId));
   }
-  function assayState(id) {
-    return workflowProgress.assays?.find((assay) => assay?.id === id)?.state || 'not-started';
+  // workflowProgress's default at options.workflowProgress (:52) carries no
+  // assays/statuses at all, so a lookup miss falls back to
+  // measurementStatus(null)'s all-lowest record rather than leaving the pill
+  // undefined on first paint.
+  function measurementStatusFor(id) {
+    const entry = Array.isArray(workflowProgress.assays)
+      ? workflowProgress.assays.find((assay) => assay?.id === id)
+      : null;
+    return entry?.status || measurementStatus(null);
   }
   function compassText(value, fallback) {
     return typeof value === 'string' && value.trim() ? value.trim() : fallback;
@@ -15454,14 +16221,15 @@ function renderShell(root, store, router, options = {}) {
     if (comparison.mode === 'groups' && groups.length > 0) return groups.join(' vs ');
     return '';
   }
-  function measurementScope(experiment, map, routeId) {
-    // Research brief accepts measurement-scoped details, and the measurement
-    // page is entirely one measurement. Everything else is whole-study. The
-    // shell only names the scope; each step still owns its data binding.
-    if (!['describe', 'measurement'].includes(routeId)) return 'Whole study';
+  // Research brief accepts measurement-scoped SUGGESTIONS while writing a
+  // study-wide narrative, and the measurement page is entirely one
+  // measurement; everything else (including the read-only Review) has no
+  // single measurement in scope. Only those two routes need the active
+  // measurement's own label.
+  function compassMeasurementLabel(experiment, map) {
     const measurements = Array.isArray(map?.measurements) ? map.measurements : [];
     const active = measurements.find((measurement) => measurement?.id === experiment.activeAssayId);
-    return `Measurement: ${compassText(active?.label, 'Not selected')}`;
+    return compassText(active?.label, 'Not selected');
   }
   function nextDecisionDestination(nextDecision, experiment) {
     if (!nextDecision || typeof nextDecision !== 'object' || typeof nextDecision.routeId !== 'string') return null;
@@ -15478,12 +16246,11 @@ function renderShell(root, store, router, options = {}) {
     const titleText = compassText(experiment.meta?.title, compassText(map.question?.value, 'Untitled study'));
     const questionText = compassText(map.question?.value, '');
     const systemText = compassText(map.system?.value, '');
-    const scopeText = measurementScope(experiment, map, activeId);
+    const scopeLine = compassScopeLine(activeId, compassMeasurementLabel(experiment, map));
 
     workflowSummary.textContent = compassDisplayText(titleText);
     workflowSummary.title = titleText;
     workflowSummary.setAttribute('aria-label', titleText);
-    const scopeLine = `Now editing: ${scopeText}`;
     compassScope.textContent = compassDisplayText(scopeLine);
     compassScope.title = scopeLine;
     compassScope.setAttribute('aria-label', scopeLine);
@@ -15559,8 +16326,10 @@ function renderShell(root, store, router, options = {}) {
       select.textContent = assay.label || `Measurement ${index + 1}`;
       select.addEventListener('click', () => { if (assay.id !== store.get().activeAssayId) store.patch({ activeAssayId: assay.id }); });
       const badge = document.createElement('span');
-      badge.className = `assay-progress-badge is-${assayState(assay.id)}`;
-      badge.textContent = stateLabel(assayState(assay.id));
+      const status = measurementStatusFor(assay.id);
+      const toneClass = MEASUREMENT_TONE_CLASS[status.tone] || MEASUREMENT_TONE_CLASS.neutral;
+      badge.className = `assay-progress-badge ${toneClass}`;
+      badge.textContent = measurementStatusLabel(status.headline.scope, status.headline.status);
       pill.append(select, badge);
       if (assays.length > 1) {
         const remove = document.createElement('button');
@@ -15829,7 +16598,7 @@ function renderShell(root, store, router, options = {}) {
       destination.routeId === activeId &&
       (!destination.measurementId || destination.measurementId === experiment.activeAssayId);
     const continueDestination = isCurrentDestination(mapDestination, currentExperiment) ? null : mapDestination;
-    position.textContent = index === -1 ? 'Guide (optional)' : `Step ${index + 1} of ${steps.length}`;
+    position.textContent = footerPositionLabel(router.steps, activeId);
     back.disabled = index <= 0;
     next.disabled = continueDestination === null && (index === -1 || index >= steps.length - 1);
     next.textContent = continueDestination ? 'Continue to next decision' : 'Continue';
@@ -17247,6 +18016,16 @@ const feedbackStep = {
 // Deliberately describes the workflow and concepts, not a numbered tutorial:
 // the app is usable outside-in. The optional guided example is a separate
 // seven-step aid; Guide remains reference material, not an eighth step.
+//
+// The walkthrough-start gate below shares core/appController.js's
+// isExampleOrigin(origin) rather than re-deriving the example/template
+// equivalence here (see that module's own comment): an opened example is
+// retagged 'template' the moment it lands in the store, so a literal
+// `origin === 'example'` check can never open. ui/walkthrough.js's
+// completion-screen "Use as template" action already routes through
+// appController.js's isExampleOrigin-guarded adoptExampleTemplate, so it
+// needs no separate check of its own here.
+
 
 /**
  * A titled, searchable section: an <h2> plus whatever nodes `build(container)`
@@ -17312,6 +18091,7 @@ const guideStep = {
     getGuidedStatus,
     onStartGuided,
     onResumeGuided,
+    onRestartGuided,
     onExplainGuided,
   } = {}) {
     main.textContent = '';
@@ -17321,20 +18101,41 @@ const guideStep = {
     heading.textContent = 'Guide';
     main.appendChild(heading);
 
-    const isExample = store.get().meta?.origin === 'example';
+    // isExampleOrigin (core/appController.js) accepts BOTH 'example' and
+    // 'template': openExampleStudy retags the opened example 'template' the
+    // moment it lands in the store, and nothing in the current app ever
+    // writes the older 'example' tag into a live store, so checking for
+    // 'example' alone would make Start permanently unreachable.
+    const isExample = isExampleOrigin(store.get().meta?.origin);
     const guideStatus = guideGuidedStatus(guidedStatus, getGuidedStatus);
-    const guideAction = isExample && guideStatus === 'paused'
-      ? { label: 'Resume example walkthrough', callback: onResumeGuided }
-      : isExample && guideStatus === 'not-started'
-        ? { label: 'Start example walkthrough', callback: onStartGuided }
-        : { label: 'Explain the workflow', callback: onExplainGuided };
+    const guideAction = guideStatus === 'paused'
+      ? {
+          label: 'Resume example walkthrough',
+          callback: onResumeGuided,
+          title: 'Resume the optional seven-step example walkthrough without changing this study.',
+        }
+      : guideStatus === 'completed'
+        ? {
+            label: 'Restart example walkthrough',
+            callback: onRestartGuided,
+            title: 'Restart the optional seven-step example walkthrough from its first step.',
+          }
+        : isExample && guideStatus === 'not-started'
+          ? {
+              label: 'Start example walkthrough',
+              callback: onStartGuided,
+              title: 'Open the optional seven-step example walkthrough without changing this study.',
+            }
+          : {
+              label: 'Explain the workflow',
+              callback: onExplainGuided,
+              title: 'Open a contextual explanation without changing your study or walkthrough progress.',
+            };
     const guideButton = document.createElement('button');
     guideButton.type = 'button';
     guideButton.className = 'copy-button guide-tour-button';
     guideButton.textContent = guideAction.label;
-    guideButton.title = isExample
-      ? 'Open the optional seven-step example walkthrough without changing this study.'
-      : 'Open a contextual explanation without changing your study or walkthrough progress.';
+    guideButton.title = guideAction.title;
     guideButton.addEventListener('click', () => {
       if (typeof guideAction.callback === 'function') guideAction.callback('guide');
     });
@@ -17489,8 +18290,9 @@ const guideStep = {
           c,
           'Your work is autosaved in this browser, so a refresh restores it. Local storage is a ' +
             'convenience, not a safe record — it can be cleared by the browser, is not shared ' +
-            'between machines, and is lost in private/incognito windows. To keep a copy, use the ' +
-            'Download buttons on the Review step.'
+            'between machines, and is lost in private/incognito windows. To keep a restorable ' +
+            'copy, use “Project backup (.micronaut.json, importable)” on the Settings step — ' +
+            'Review’s downloads are reports for reading, not files you can import back in.'
         );
       })
     );
@@ -17508,8 +18310,10 @@ const guideStep = {
           c,
           'Found something wrong, or missing? Use “Copy feedback report” in the header — it copies ' +
             'the current step, your browser, and your full study as text, ready to paste into an ' +
-            'email or a GitHub issue. “GitHub issue” next to it opens a prefilled issue with the ' +
-            'same report already in the body. Neither ever sends anything on its own.'
+            'email or a GitHub issue. “Open GitHub issue” next to it copies that same report, then ' +
+            'opens GitHub’s new-issue page labeled feedback — the link itself carries no feedback, ' +
+            'browser details, or study data, so paste the copied report into the issue yourself. ' +
+            'Neither ever sends anything on its own.'
         );
       })
     );
@@ -17719,7 +18523,7 @@ function createStudyMap({ store, router, getMap, document: suppliedDocument } = 
     fieldset.appendChild(help);
     const currentMode = map.comparison?.mode || 'not-decided';
     for (const choice of [
-      ['groups', 'Compare groups or conditions'],
+      ['groups', 'Compares groups or treatments'],
       ['observational', 'Observational study'],
     ]) {
       const label = doc.createElement('label');
@@ -18080,9 +18884,72 @@ function card(parent, { icon, title, body, onClick }) {
   return button;
 }
 
+// Guided statuses are exactly these four (core/guidedProgress.js); anything
+// else -- a missing projection, a stale shape, or a malformed value such as
+// `{ status: 42 }` -- is NOT the same thing as a real 'not-started' study and
+// must not be read as one (that would silently offer to START a walkthrough
+// whose progress this page cannot actually account for). Such input resolves
+// to `null` here so the caller degrades to the non-mutating Explain action
+// instead of guessing.
+const HOME_GUIDED_STATUSES = new Set(['not-started', 'active', 'paused', 'completed']);
+
 function homeGuidedStatus(guidedStatus, getGuidedStatus) {
   const status = typeof getGuidedStatus === 'function' ? getGuidedStatus() : guidedStatus;
-  return status && typeof status.status === 'string' ? status.status : 'not-started';
+  const value = status && typeof status.status === 'string' ? status.status : null;
+  return HOME_GUIDED_STATUSES.has(value) ? value : null;
+}
+
+// The Study map card's primary action, keyed off the guided-walkthrough
+// status. 'active' intentionally reuses onResumeGuided: the controller's
+// resume() and start() are both the same openWalkthrough() (see
+// ui/walkthrough.js), which for an 'active' status invokes no transition at
+// all and simply reopens the panel where the reader left it -- the exact
+// behaviour main.js already relies on to auto-reopen an active walkthrough
+// on load. secondaryExplain marks every branch where "Explain Study map"
+// must additionally be offered so it is never lost as a reachable action.
+function homeGuidedEntryForStatus(status, options) {
+  if (status === 'not-started') {
+    return {
+      title: 'Start example walkthrough',
+      body: 'Launch the guided walkthrough of a finished example study.',
+      onClick: options.onStartGuided,
+      secondaryExplain: true,
+    };
+  }
+  if (status === 'active') {
+    return {
+      title: 'Continue walkthrough',
+      body: 'Reopen the walkthrough panel where you left it.',
+      onClick: options.onResumeGuided,
+      secondaryExplain: true,
+    };
+  }
+  if (status === 'paused') {
+    return {
+      title: 'Resume walkthrough',
+      body: 'Continue the optional walkthrough from where you paused.',
+      onClick: options.onResumeGuided,
+      secondaryExplain: true,
+    };
+  }
+  if (status === 'completed') {
+    return {
+      title: 'Restart walkthrough',
+      body: 'Start the optional walkthrough again from Study map.',
+      onClick: options.onRestartGuided,
+      secondaryExplain: true,
+    };
+  }
+  // status === null: no recognized guided status (missing or malformed).
+  // Explain is the only entry that never mutates guided progress, so it is
+  // the only safe default when this page cannot tell what state the
+  // walkthrough is actually in.
+  return {
+    title: 'Explain Study map',
+    body: 'Open contextual guidance without changing your study or guided progress.',
+    onClick: options.onExplainGuided,
+    secondaryExplain: false,
+  };
 }
 
 function appendLinkRow(main, label, onClick) {
@@ -18112,23 +18979,46 @@ function appendOwnership(main, { title, body }) {
   return ownership;
 }
 
+// Exported so tests can drive every guided-status branch directly against
+// the shared DOM stub, without needing a full store/router/experiment map to
+// render the rest of the Study map page.
 function appendGuidedEntry(main, options) {
   const status = homeGuidedStatus(options.guidedStatus, options.getGuidedStatus);
-  const entry = status === 'paused'
-    ? { title: 'Resume walkthrough', body: 'Continue the optional walkthrough from where you paused.', onClick: options.onResumeGuided }
-    : status === 'completed'
-      ? { title: 'Restart walkthrough', body: 'Start the optional walkthrough again from Study map.', onClick: options.onRestartGuided }
-      : { title: 'Explain Study map', body: 'Open contextual guidance without changing your study or guided progress.', onClick: options.onExplainGuided };
+  const entry = homeGuidedEntryForStatus(status, options);
   const grid = document.createElement('div');
   grid.className = 'home-grid';
   card(grid, {
     icon: 'walkthrough',
-    ...entry,
+    title: entry.title,
+    body: entry.body,
     onClick: () => {
       if (typeof entry.onClick === 'function') entry.onClick('home');
     },
   });
   main.appendChild(grid);
+
+  // Explain Study map never mutates guided progress, so it stays reachable
+  // as a secondary action in every state that already has its own primary
+  // action above it (the 'null'/degraded case skips this row because
+  // Explain IS the primary action there already -- see
+  // homeGuidedEntryForStatus).
+  if (entry.secondaryExplain && typeof options.onExplainGuided === 'function') {
+    appendLinkRow(main, 'Just want an explanation? Explain Study map.', () => {
+      options.onExplainGuided('home');
+    });
+  }
+}
+
+// Also exported for the same direct-test reason as appendGuidedEntry: the
+// "no dead button" contract (row absent without onOpenExample) is cheapest
+// to prove against this function alone.
+function appendExampleLink(main, onOpenExample) {
+  if (typeof onOpenExample !== 'function') return null;
+  return appendLinkRow(
+    main,
+    'Want to see a finished plan? Open the example study.',
+    () => onOpenExample()
+  );
 }
 
 const homeStep = {
@@ -18155,13 +19045,7 @@ const homeStep = {
     main.appendChild(createStudyMap({ store, router }).element);
     appendGuidedEntry(main, options);
 
-    if (typeof onOpenExample === 'function') {
-      appendLinkRow(
-        main,
-        'Want to see a finished plan? Open the example study.',
-        () => onOpenExample()
-      );
-    }
+    appendExampleLink(main, onOpenExample);
     appendLinkRow(main, 'Looking for a specific term or step? See the Guide.', () => {
       if (router) router.navigate('guide');
     });
@@ -18756,6 +19640,12 @@ const designStep = {
 //
 // The steps stay independently renderable, which is what keeps this a
 // composition: any of them can still be mounted alone.
+//
+// The header (including its status badges) is a render-time snapshot: it is
+// built once from `options.workflowProgress` when this page renders and does
+// not update itself afterward. The embedded sub-steps below it re-render
+// themselves on their own store subscriptions, so the header can go stale
+// relative to them -- pre-existing behaviour, not introduced by this module.
 
 
 const MEASUREMENT_SECTIONS = Object.freeze([
@@ -18774,13 +19664,15 @@ function activeMeasurement(experiment) {
   };
 }
 
-function appendStatusBadge(parent, status) {
+function appendStatusBadge(parent, scope, status) {
   const badge = document.createElement('span');
   // State is carried by the text itself, not only by the colour the dataset
   // attribute selects -- the same rule the rest of the app follows.
   badge.className = 'measurement-status-badge';
+  badge.dataset.scope = scope;
   badge.dataset.status = status;
-  badge.textContent = measurementStatusLabel(status);
+  badge.dataset.tone = (MEASUREMENT_STATUS_TONES[scope] && MEASUREMENT_STATUS_TONES[scope][status]) || 'neutral';
+  badge.textContent = measurementStatusLabel(scope, status);
   parent.appendChild(badge);
   return badge;
 }
@@ -18845,10 +19737,17 @@ function createMeasurementStep({ panelStep, namingStep }) {
         return;
       }
 
-      const map = buildExperimentMap(experiment);
-      const mapped = (Array.isArray(map.measurements) ? map.measurements : [])
-        .find((measurement) => measurement && measurement.id === assay.id);
-      appendStatusBadge(header, measurementStatus(mapped));
+      const progressAssays = Array.isArray(options.workflowProgress?.assays)
+        ? options.workflowProgress.assays
+        : [];
+      const status = progressAssays.find((entry) => entry && entry.id === assay.id)?.status
+        || measurementStatus(null);
+      const statusGroup = document.createElement('div');
+      statusGroup.className = 'measurement-status-group';
+      for (const scope of MEASUREMENT_STATUS_SCOPES) {
+        appendStatusBadge(statusGroup, scope, status[scope]);
+      }
+      header.appendChild(statusGroup);
 
       const view = assayView(experiment, assay.id);
       const readout = typeof view.readoutText === 'string' && view.readoutText.trim()
@@ -19170,12 +20069,20 @@ function createNamingStep(kb) {
       'Downloads a bench schedule built from your timing answers above -- imports into Google Calendar, Outlook, or Apple Calendar with no login.';
     downloadScheduleBtn.addEventListener('click', () => {
       const view = currentExperimentView();
-      const sampleCount = planFilenames(view, NAMING_CONFIG).length;
+      // planFilenames(...).length is the planned FILE/acquisition-run count
+      // (one row per group x factor x biological replicate x TECHNICAL
+      // replicate); physicalSampleCount(view.design) is the physical-specimen
+      // count (technical axis excluded). Mounting a slide is a physical-
+      // sample operation, so it must scale by the latter, not the former --
+      // see engine/conditions.js's physicalSampleCount doc comment.
+      const acquisitionRunCount = planFilenames(view, NAMING_CONFIG).length;
+      const sampleCount = physicalSampleCount(view.design);
       const activeAssay = assayById(store.get(), assayId);
       const events = buildIcsSchedule({
         assayLabel: (activeAssay && activeAssay.label) || 'This assay',
         timing: view.timing,
         sampleCount,
+        acquisitionRunCount,
         // Tomorrow at 09:00 local -- a schedule dated "right now" would put
         // its first block in the past for whichever calendar app renders
         // it the moment the file is opened.
@@ -19874,7 +20781,7 @@ function createOverviewStep(kb) {
       const explainer = document.createElement('p');
       explainer.className = 'proposals-empty supporting-description';
       explainer.textContent =
-        'A deterministic review of this study, built entirely from what you’ve entered on the other steps -- nothing here is LLM-generated.';
+        'A deterministic review of this study -- every fact below comes from parameters you entered or from authored knowledge-pack content -- nothing here is LLM-generated.';
       main.appendChild(explainer);
 
       const doc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
@@ -19960,7 +20867,7 @@ function createOverviewStep(kb) {
         toastMessage: 'Downloaded the file manifest as CSV.',
       });
       addDownloadButton({
-        label: 'Study data (.json)', fallbackName: 'study-overview', ext: 'json', mime: 'application/json', render: renderJson,
+        label: 'Study report data (.json, not importable)', fallbackName: 'study-overview', ext: 'json', mime: 'application/json', render: renderJson,
         toastMessage: 'Downloaded the study overview as JSON.',
       });
       const secondaryActions = document.createElement('div');
@@ -19984,7 +20891,7 @@ function createOverviewStep(kb) {
         const ok = await copyToClipboard(renderLlmPrompt(freshDoc, freshTriage));
         if (showToast) showToast(ok
           ? 'Copied the prompt -- paste it into your own LLM. Nothing was sent from this app.'
-          : 'Could not copy automatically -- use Export study → Study data (.json) instead.');
+          : 'Could not copy automatically -- use Export study → Study report data (.json, not importable) instead.');
       });
       secondaryActions.appendChild(copyLlmBtn);
       const printBtn = document.createElement('button');
@@ -20031,13 +20938,15 @@ function createOverviewStep(kb) {
 
       const conformanceHeading = document.createElement('h2');
       conformanceHeading.className = 'overview-node-title';
-      conformanceHeading.textContent = 'Planner checks';
+      conformanceHeading.textContent = 'Export checks';
       conformanceSection.appendChild(conformanceHeading);
 
       const verdict = document.createElement('div');
       verdict.className = `conformance-verdict conformance-${conformance.readiness}`;
       verdict.textContent = conformance.readiness === 'ready'
-        ? 'All planner checks complete'
+        ? (triage.counts.total > 0
+            ? `All export checks pass (${triage.counts.total} open decision${triage.counts.total === 1 ? '' : 's'} remain)`
+            : 'All export checks pass')
         : conformance.readiness === 'blocked'
           ? `Blocked: ${conformance.counts.blocked} issue(s) need correction before final export.`
           : `Needs review: ${conformance.counts.needsReview} incomplete or provisional item(s) remain.`;
@@ -20045,7 +20954,7 @@ function createOverviewStep(kb) {
 
       const disclaimer = document.createElement('p');
       disclaimer.className = 'panel-empty';
-      disclaimer.textContent = 'Planner checks do not validate scientific validity, statistical power, ethics approval, biosafety, or instrument suitability.';
+      disclaimer.textContent = 'Export checks do not validate scientific validity, statistical power, ethics approval, biosafety, or instrument suitability, and they do not check your Study map decisions (research question, system, comparison mode, or experimental unit) -- see Decisions above for those.';
       conformanceSection.appendChild(disclaimer);
 
       const allConformanceIssues = reportIssues(conformance);
@@ -21533,7 +22442,7 @@ const settingsStep = {
     const title = document.createElement('h1'); title.className = 'step-heading'; title.textContent = 'Settings';
     const intro = document.createElement('p'); intro.className = 'proposals-empty supporting-description'; intro.textContent = 'Project backups and storage management are kept here. Restore (previous saved versions) and the color theme are in the header/nav Utilities menu.';
     const actions = document.createElement('div'); actions.className = 'overview-secondary-actions';
-    actions.append(settingsButton('Download project backup', () => options.onExportProject?.()));
+    actions.append(settingsButton('Project backup (.micronaut.json, importable)', () => options.onExportProject?.()));
     const file = document.createElement('input'); file.type = 'file'; file.accept = '.json,application/json'; file.hidden = true; file.addEventListener('change', () => { const selected = file.files?.[0]; file.value = ''; if (selected) Promise.resolve(options.onImportProject?.(selected)); });
     actions.append(settingsButton('Import project backup', () => file.click()), file);
     actions.append(settingsButton('Start a blank study', () => { if (window.confirm('Start a blank study? Your current work remains available in Restore.')) options.onNewBlank?.(); }));
@@ -21644,16 +22553,32 @@ function measurementReadout(assay) {
 }
 
 // measurementSystemSummary / measurementPlanningState / progressStateLabel
-// lived here to describe a measurement's state in prose on the old list. The
-// registry shows one status badge instead (engine/measurementStatus.js), which
-// is the single vocabulary a reader now has to learn, so they are gone rather
-// than kept as a second opinion.
+// lived here to describe a measurement's state in prose on the old list. That
+// prose collapsed three separate questions -- is it DEFINED, does its PLAN
+// still need a decision, do its export CHECKS pass -- into one word, which is
+// exactly what engine/measurementStatus.js now refuses to do: it reports
+// definition/plan/conformance as three scoped axes plus a `headline` (the
+// first axis not already at its best status) and that headline's `tone`. The
+// registry renders the headline as the row's main badge and the OTHER two
+// axes as muted chips in the same status cell (no new grid column -- see
+// app.css:4996's 7-column template), so the detail a reader used to lose is
+// visible again without a second, competing vocabulary.
 
 const studyStep = {
   id: 'study',
   title: 'Measurements',
-  render(main, store, { showToast, router } = {}) {
+  render(main, store, { showToast, router, workflowProgress, getWorkflowProgress } = {}) {
     main.textContent = '';
+
+    // The render-time snapshot renderAssayList() reads for ordinary view
+    // changes (search/filter, delete) -- deliberately NOT recomputed per
+    // keystroke. store.setPath (the copy-groups path below) mutates `assays`
+    // IN PLACE, so main.js:497-501's `assays !== lastAssays` re-render guard
+    // never fires for it and this snapshot would go stale; that one path
+    // reassigns `currentProgress` via `getWorkflowProgress()` before
+    // re-rendering. See main.js's own comment on `getWorkflowProgress` for
+    // the producer side of this.
+    let currentProgress = workflowProgress && typeof workflowProgress === 'object' ? workflowProgress : {};
 
     const heading = document.createElement('h1');
     heading.className = 'step-heading';
@@ -21731,6 +22656,13 @@ const studyStep = {
             : `Applied to ${applied} measurement(s).`
         );
       }
+      // store.setPath above mutates `assays` IN PLACE (core/store.js), so
+      // main.js:497-501's `assays !== lastAssays` re-render subscriber does
+      // NOT fire for this path and `currentProgress` would otherwise still
+      // hold the pre-copy snapshot. Re-derive it explicitly before
+      // re-rendering -- this is the one path that needs to, per this
+      // function's closure notes above.
+      if (getWorkflowProgress) currentProgress = getWorkflowProgress();
       renderAssayList();
     });
     main.appendChild(applyBtn);
@@ -21764,11 +22696,13 @@ const studyStep = {
 
     const statusSelect = registrySelect(controls, {
       label: 'Status',
-      options: [
-        { value: 'all', label: 'All statuses' },
-        ...MEASUREMENT_STATUSES.map((status) => ({ value: status, label: measurementStatusLabel(status) })),
-      ],
+      // Fed straight from MEASUREMENT_STATUS_FILTERS (engine/measurementStatus.js)
+      // -- there is no second, hand-authored status vocabulary for this
+      // select to drift out of sync with.
+      options: [{ value: 'all', label: 'All statuses' }, ...MEASUREMENT_STATUS_FILTERS],
       onChange: (value) => {
+        // Each option's value is `scope:status` (e.g. 'plan:needs-decision');
+        // matched against that same scope on the row's status record below.
         statusFilter = value;
         renderAssayList();
       },
@@ -21857,16 +22791,28 @@ const studyStep = {
       renderModalityOptions(assays);
       addBtn.disabled = assays.length >= MAX_STUDY_ROWS;
 
-      const map = buildExperimentMap(experiment);
-      const mappedById = new Map(
-        (Array.isArray(map.measurements) ? map.measurements : []).map((measurement) => [measurement.id, measurement])
-      );
+      // Read off `currentProgress` (the render-time snapshot, refreshed only
+      // on the copy-groups path -- see the closure notes above `let
+      // currentProgress` and inside applyBtn's click handler) rather than
+      // rebuilding a second, conformance-free map here.
+      const measurements = Array.isArray(currentProgress.map && currentProgress.map.measurements)
+        ? currentProgress.map.measurements
+        : [];
+      const mappedById = new Map(measurements.map((measurement) => [measurement.id, measurement]));
+      const progressAssays = Array.isArray(currentProgress.assays) ? currentProgress.assays : [];
+      const statusById = new Map(progressAssays.map((entry) => [entry.id, entry.status]));
 
       let shown = 0;
       assays.forEach((assay, index) => {
         const mapped = mappedById.get(assay.id) || null;
-        const status = measurementStatus(mapped);
-        if (statusFilter !== 'all' && status !== statusFilter) return;
+        // `measurementStatus(null)` is the module's own all-lowest fallback
+        // (definition:draft headline) for the case -- never expected in
+        // practice -- where this assay is absent from the progress snapshot.
+        const status = statusById.get(assay.id) || measurementStatus(null);
+        if (statusFilter !== 'all') {
+          const [scope, wantStatus] = statusFilter.split(':');
+          if (status[scope] !== wantStatus) return;
+        }
         if (modalityFilter !== 'all') {
           const modality = assay.acquisition && typeof assay.acquisition.modality === 'string' ? assay.acquisition.modality.trim() : '';
           if (modality !== modalityFilter) return;
@@ -21898,13 +22844,36 @@ const studyStep = {
         nameCell.appendChild(readoutLine);
         row.appendChild(nameCell);
 
+        // One status cell, one status record: the headline badge plus the
+        // other two axes as muted chips -- no new grid column (app.css:4996's
+        // 7-column template stays untouched). Every label AND every data
+        // attribute below reads off this same `status` record, so a badge's
+        // text and its data-* attributes cannot disagree with each other.
         const statusCell = document.createElement('div');
         statusCell.className = 'measurement-registry-cell measurement-registry-status';
-        const badge = document.createElement('span');
-        badge.className = 'measurement-status-badge';
-        badge.dataset.status = status;
-        badge.textContent = measurementStatusLabel(status);
-        statusCell.appendChild(badge);
+        const badgeGroup = document.createElement('div');
+        badgeGroup.className = 'measurement-status-badges';
+        statusCell.appendChild(badgeGroup);
+
+        const headlineBadge = document.createElement('span');
+        headlineBadge.className = 'measurement-status-badge';
+        headlineBadge.dataset.scope = status.headline.scope;
+        headlineBadge.dataset.status = status.headline.status;
+        headlineBadge.dataset.tone = status.tone;
+        headlineBadge.textContent = measurementStatusLabel(status.headline.scope, status.headline.status);
+        badgeGroup.appendChild(headlineBadge);
+
+        for (const scope of MEASUREMENT_STATUS_SCOPES) {
+          if (scope === status.headline.scope) continue;
+          const scopedStatus = status[scope];
+          const chip = document.createElement('span');
+          chip.className = 'measurement-status-chip';
+          chip.dataset.scope = scope;
+          chip.dataset.status = scopedStatus;
+          chip.dataset.tone = (MEASUREMENT_STATUS_TONES[scope] && MEASUREMENT_STATUS_TONES[scope][scopedStatus]) || 'neutral';
+          chip.textContent = measurementStatusLabel(scope, scopedStatus);
+          badgeGroup.appendChild(chip);
+        }
         row.appendChild(statusCell);
 
         appendCell(row, 'measurement-registry-modality', mapped?.modality || '—');
@@ -22210,6 +23179,14 @@ function createWalkthroughController({
     hide();
   }
 
+  // "Use as template" below calls onAdoptExample, which main.js wires to
+  // appController.js's adoptExampleTemplate -- that function already guards
+  // itself with the shared isExampleOrigin(origin) predicate (accepts both
+  // 'example' and 'template') before patching meta.origin, so this action
+  // needs no second copy of that check here. It was reachable only via the
+  // identical root cause ui/steps/guide.js:101 had (a walkthrough that could
+  // never reach 'completed' status because Start was gated on the stale
+  // 'example'-only check); fixing that gate is what makes this button live.
   function renderCompletion() {
     const card = element(doc, 'section', 'guided-walkthrough-panel guided-walkthrough-complete');
     card.setAttribute('aria-label', 'Example walkthrough complete');
@@ -22386,8 +23363,6 @@ function createWalkthroughController({
 }
   // ---- src/main.js ----
 
-const AUTOSAVE_DEBOUNCE_MS = 500;
-
 /**
  * Read the knowledge pack from the ONE place its global is read, then hand
  * it to shapeAppKb (engine/kbpack.js) for the actual shaping -- that part is
@@ -22405,71 +23380,70 @@ function loadAppKb() {
   return shapeAppKb(rawKb);
 }
 
-/**
- * The thin wrapper around core/persist.js's loadMostRecentRecoverable that
- * supplies main.js's own console.error logging and the empty-study fallback --
- * persist.js deliberately doesn't know what a fresh study looks like, so
- * `experiment: null` means "start fresh" here. Only fires when NO usable
- * autosave exists at all (true first run, or every ring slot was corrupted) --
- * an existing in-progress study is never touched.
- *
- * A first run starts BLANK, not on the shipped oregano example. Seeding the
- * example made a visitor's first workspace someone else's four-measurement
- * study, and an entire ownership subsystem (banners, read-only exploration,
- * "make a copy") existed only to walk that back. The example is still one
- * click away -- see openExampleStudy() and Home's "Open the example study" --
- * but it is now something the visitor asks for rather than something they
- * have to disown.
- */
-function loadInitialExperiment() {
-  const { experiment, skippedCount, totalSaved } = loadMostRecentRecoverable({
-    onUnreadable: (id, err) =>
-      console.error(`Discarding an unreadable autosave (slot ${id}), trying the next one:`, err),
-  });
-  return {
-    experiment: experiment || emptyExperiment(),
-    skippedCount,
-    totalSaved,
-    // `totalSaved` can be non-zero when every slot was unreadable. Only an
-    // experiment actually recovered from the ring justifies a saved claim.
-    isPersisted: Boolean(experiment),
-  };
-}
-
-// A study's origin describes how it entered the workspace; it is not
-// provenance. Keep this immutable so imports/restores replace the entire
-// snapshot rather than leaking metadata from the study that was open before.
-function withOrigin(experiment, origin) {
-  return { ...experiment, meta: { ...(experiment.meta || {}), origin } };
-}
-
-function projectFilename(experiment) {
-  const title = String(experiment?.meta?.title || 'micronaut-study')
-    .trim()
-    .replace(/[^A-Za-z0-9_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return `${title || 'micronaut-study'}.micronaut.json`;
-}
-
-function recoveryEntries() {
-  // The shell receives display-only data, never a persistence backend. It
-  // therefore cannot accidentally load, mutate, or clear localStorage on its
-  // own; selected restores always come back through main's callback below.
-  return listSaved().map((id) => {
-    const raw = loadExperiment(id);
-    const title = typeof raw?.meta?.title === 'string' && raw.meta.title.trim()
-      ? raw.meta.title.trim()
-      : 'Untitled study';
-    return { id, title };
-  });
-}
+// A first run starts BLANK, not on the shipped oregano example. Seeding the
+// example made a visitor's first workspace someone else's four-measurement
+// study, and an entire ownership subsystem (banners, read-only exploration,
+// "make a copy") existed only to walk that back. The example is still one
+// click away -- see openExampleStudy() (core/appController.js) and Home's
+// "Open the example study" -- but it is now something the visitor asks for
+// rather than something they have to disown.
 
 // Bootstrap, not top-level await -- the single-file inliner forbids
 // top-level await since the released artifact is one classic (non-module,
 // non-async) IIFE.
 function init() {
-  const { experiment: initialExperiment, skippedCount, totalSaved, isPersisted } = loadInitialExperiment();
+  // The persist.js bundle handed to appController -- explicit rather than
+  // importing core/persist.js directly inside appController.js, so a test
+  // can supply an in-memory fake for every one of these without touching
+  // localStorage.
+  const persistBundle = {
+    clearAll,
+    deleteExperiment,
+    exportToFile,
+    importFromFile,
+    listSaved,
+    loadExperiment,
+    loadMostRecentRecoverable,
+    loadRecoverableSlot,
+    markChanged,
+    markExported,
+    saveExperiment,
+  };
+
+  const { experiment: initialExperiment, skippedCount, totalSaved, isPersisted } = resolveInitialExperiment(
+    persistBundle,
+    emptyExperiment,
+    {
+      onUnreadable: (id, err) =>
+        console.error(`Discarding an unreadable autosave (slot ${id}), trying the next one:`, err),
+    }
+  );
   const store = createStore(initialExperiment);
+
+  // The guidedProgress.js bundle handed to appController, same reasoning as
+  // persistBundle above.
+  const guidedBundle = {
+    load: loadGuidedProgress,
+    start: startGuidedProgress,
+    resume: resumeGuidedProgress,
+    pause: pauseGuidedProgress,
+    advance: advanceGuidedProgress,
+    restart: restartGuidedProgress,
+  };
+
+  // The lifecycle coordinator: every closure that touches store+persist
+  // (recovery ring, project import/export, guided-progress transitions, the
+  // debounced autosave subscriber) lives in core/appController.js now, not
+  // here -- see that module's header comment for why.
+  const appController = createAppController({
+    store,
+    persist: persistBundle,
+    guided: guidedBundle,
+    primaryWorkflow: PRIMARY_WORKFLOW,
+    createExampleStudy: createDefaultStudy,
+    createEmptyStudy: emptyExperiment,
+    isPersisted,
+  });
 
   const kb = loadAppKb();
   const describeStep = createDescribeStep(kb);
@@ -22499,150 +23473,7 @@ function init() {
   const router = createRouter(steps);
 
   const root = document.getElementById('app');
-  let saveState = { status: isPersisted ? 'saved' : 'unsaved', savedAt: null, error: null };
   let shell = null;
-  function setSaveState(next) {
-    saveState = { ...saveState, ...next };
-    // UX-08 supplies this narrow view updater. The optional call keeps this
-    // coordinator compatible with the pre-refactor shell while ensuring a
-    // save result can persist visibly without rebuilding the whole shell.
-    if (shell && typeof shell.setSaveState === 'function') shell.setSaveState(saveState);
-  }
-
-  function reportStorageFailure() {
-    setSaveState({
-      status: 'failed',
-      error: 'Storage is full or unavailable. Export a project backup, then free space from Settings → Clear all stored data (or delete an old saved version from Restore).',
-    });
-  }
-
-  function reportPersistentLifecycleFailure(message) {
-    // The shell's save indicator is the one persistent lifecycle-status
-    // surface. A toast alone vanishes after three seconds, leaving an import
-    // or recovery failure indistinguishable from a successful no-op.
-    setSaveState({ status: 'failed', error: message });
-    showToast(message);
-  }
-
-  function exportProjectBackup() {
-    exportToFile(store.get(), projectFilename(store.get()));
-    markExported({ onQuotaExceeded: reportStorageFailure });
-    showToast('Project backup downloaded.');
-  }
-
-  async function importProjectBackup(file) {
-    if (!file) return;
-    try {
-      const { experiment: imported, issues } = await importFromFile(file);
-      store.replace(withOrigin(imported, 'imported'));
-      // replace() schedules the ordinary autosave subscriber. Clear any
-      // earlier lifecycle failure immediately; that subscriber will keep the
-      // status at saving, then replace it with saved or a storage failure.
-      setSaveState({ status: 'saving', error: null });
-      // core/importValidate.js sanitizes rather than rejects most shape
-      // problems (a malformed provenance slot, an assay reset to defaults)
-      // so the rest of a real backup is never thrown away over one bad
-      // corner -- but a sanitized field is exactly the kind of change a
-      // project owner needs to notice, not one that should vanish into the
-      // console alone.
-      if (Array.isArray(issues) && issues.length > 0) {
-        issues.forEach((issue) => console.warn('Project import:', issue.message));
-        showToast(
-          `Project imported, but ${issues.length} part(s) of the file were invalid and reset to defaults. See the browser console for details.`
-        );
-      } else {
-        showToast('Project imported. It is now the study being autosaved.');
-      }
-    } catch (err) {
-      reportPersistentLifecycleFailure(
-        `Could not import that project: ${err && err.message ? err.message : 'invalid file'}`
-      );
-    }
-  }
-
-  function restoreRecoverySlot(id) {
-    const { experiment, error } = loadRecoverableSlot(id, {
-      onUnreadable: (slotId, err) => console.error(`Could not restore autosave ${slotId}:`, err),
-    });
-    if (!experiment) {
-      reportPersistentLifecycleFailure(
-        `Could not restore that version: ${error ? error.message : 'it is unavailable'}`
-      );
-      return false;
-    }
-    store.replace(experiment);
-    setSaveState({ status: 'saving', error: null });
-    showToast('Restored the selected previous version.');
-    return true;
-  }
-
-  // Storage is a CONVENIENCE, never the record of truth (see persist.js's
-  // header), but until now the only in-app escape from a full or corrupt
-  // ring was closing the tab and clearing browsing data by hand -- these two
-  // give quota-exhausted or otherwise stuck users a real exit that never
-  // requires leaving the app. Neither touches the study currently open in
-  // memory: deleting a saved slot only removes ONE ring entry (the other
-  // four, and the live study, are untouched); clearing storage wipes every
-  // ring slot and the change counter, but the live in-memory study survives
-  // and the very next autosave attempt (forced immediately below, so the
-  // save indicator does not keep reporting the just-cleared failure) writes
-  // it into the now-empty ring.
-  function deleteRecoverySlot(id) {
-    deleteExperiment(id, { onQuotaExceeded: reportStorageFailure });
-    if (shell && typeof shell.setRecoveryEntries === 'function') shell.setRecoveryEntries(recoveryEntries());
-    showToast('Deleted that saved version.');
-  }
-
-  function clearAllStoredData() {
-    clearAll({ onQuotaExceeded: reportStorageFailure });
-    const savedId = saveExperiment(store.get(), { onQuotaExceeded: reportStorageFailure });
-    setSaveState(
-      savedId
-        ? { status: 'saved', savedAt: new Date().toISOString(), error: null }
-        : { status: 'unsaved', savedAt: null, error: null }
-    );
-    if (shell && typeof shell.setRecoveryEntries === 'function') shell.setRecoveryEntries(recoveryEntries());
-    showToast('Cleared all locally stored data. Your open study is unaffected, and saving has resumed.');
-  }
-
-  // Opening the example is now an explicit request, so it arrives as ordinary
-  // editable work tagged `template` ("started from the example") rather than
-  // `example` ("the shipped seed, not yours"). Nothing has to be adopted,
-  // copied, or disowned before the visitor may type in it. `origin: 'example'`
-  // still exists in the schema so older autosaves keep loading unchanged.
-  function openExampleStudy() {
-    // Preserve the exact current state synchronously, before replace() can
-    // expose example data to the autosave subscriber. This snapshot is
-    // protected from normal ring eviction: browsing or editing demo data can
-    // never delete user-entered work. If durable preservation is unavailable,
-    // do not switch workspaces at all.
-    const protectedId = saveExperiment(store.get(), {
-      onQuotaExceeded: reportStorageFailure,
-      protectFromAutomaticEviction: true,
-    });
-    if (!protectedId) {
-      reportPersistentLifecycleFailure(
-        'Could not preserve your current study, so the example was not opened. Download a project backup or free storage, then try again.'
-      );
-      return false;
-    }
-    const example = createDefaultStudy();
-    store.replace(withOrigin(example, 'template'));
-    if (shell && typeof shell.setRecoveryEntries === 'function') shell.setRecoveryEntries(recoveryEntries());
-    showToast('Opened the example study. Your study was preserved in Restore and demo activity cannot remove it.');
-    return true;
-  }
-
-  function startBlankStudy() {
-    store.replace(emptyExperiment());
-    showToast('Started a blank study. Your previous versions remain available in Restore.');
-  }
-
-  function adoptExampleTemplate() {
-    if (store.get().meta?.origin !== 'example') return false;
-    store.patch((state) => ({ meta: { ...state.meta, origin: 'template' } }));
-    return true;
-  }
 
   // One exact producer chain for the shell: use the same shaped KB and
   // naming constants as Overview, derive conformance once, then hand that
@@ -22665,52 +23496,27 @@ function init() {
     return routeId;
   }
 
-  let guidedStorageFailureAnnounced = false;
-  function reportGuidedStorageFailure(error) {
-    console.error('Could not persist guided walkthrough progress:', error);
-    // Guarded rather than calling showToast directly: this can fire before
-    // `shell` exists (the initial loadGuidedProgress call below runs ahead of
-    // renderShell), and repeatedly on every step transition once storage is
-    // broken -- announce the failure once, the first time a toast surface is
-    // actually available.
-    if (guidedStorageFailureAnnounced || !shell || typeof shell.showToast !== 'function') return;
-    guidedStorageFailureAnnounced = true;
-    shell.showToast('Walkthrough progress could not be saved — it will restart if you reload.');
-  }
-
-  let guidedProgressState = loadGuidedProgress(PRIMARY_WORKFLOW, {
-    onError: reportGuidedStorageFailure,
-  });
-
-  function applyGuidedTransition(transition, options = {}) {
-    guidedProgressState = transition(PRIMARY_WORKFLOW, {
-      ...options,
-      state: guidedProgressState,
-      onError: reportGuidedStorageFailure,
-    });
-    return guidedProgressState;
-  }
-
   let guidedController = null;
   let featureWalkthroughController = null;
 
   shell = renderShell(root, store, router, {
     kbIssueCount: kb.issues.length,
-    saveState,
-    recoveryEntries: recoveryEntries(),
+    saveState: appController.getSaveState(),
+    recoveryEntries: appController.recoveryEntries(),
     workflowProgress: currentWorkflowProgress(),
-    // These lifecycle actions replace the in-memory root and deliberately
-    // leave the five prior recovery slots intact. That makes a mistaken reset
-    // recoverable instead of making a "start over" action a data-loss trap.
-    onReset: openExampleStudy,
-    onNewBlank: startBlankStudy,
-    onAdoptExample: adoptExampleTemplate,
-    onOpenExample: openExampleStudy,
-    onExportProject: exportProjectBackup,
-    onImportProject: importProjectBackup,
-    onRestoreRecovery: restoreRecoverySlot,
-    onDeleteRecovery: deleteRecoverySlot,
+    // appController.actions carries every lifecycle callback the shell's
+    // buttons need (onReset/onNewBlank/onAdoptExample/onOpenExample/
+    // onExportProject/onImportProject/onRestoreRecovery/onDeleteRecovery/
+    // onClearAllStorage) -- the same object is spread into renderActiveStep's
+    // step options below, so both consumers share one set of callbacks.
+    ...appController.actions,
   });
+  // Explicit second phase, same two-phase pattern the pre-extraction code
+  // used (showToast was destructured from shell only after the callbacks
+  // above were already handed to renderShell): appController's callbacks are
+  // built and handed to renderShell before the shell they call back into
+  // exists at all.
+  appController.attachShell(shell);
   const { main, showToast } = shell;
 
   // Main is the sole lifecycle coordinator: the shell supplies one stable
@@ -22727,21 +23533,15 @@ function init() {
       namingConfig: NAMING_CONFIG,
       baseTemplate: BASE_TEMPLATE,
     }),
-    getProgress: () => guidedProgressState,
-    transitions: {
-      start: () => applyGuidedTransition(startGuidedProgress),
-      resume: () => applyGuidedTransition(resumeGuidedProgress),
-      pause: () => applyGuidedTransition(pauseGuidedProgress),
-      advance: (stepId) => applyGuidedTransition(advanceGuidedProgress, { fromStepId: stepId }),
-      restart: () => applyGuidedTransition(restartGuidedProgress),
-    },
+    getProgress: () => appController.getGuidedState(),
+    transitions: appController.guidedTransitions,
     routeForStep: guidedRouteIdForStep,
     stepForRoute: guidedStepIdForRoute,
     subscribe: (listener) => store.subscribe(listener),
-    onAdoptExample: adoptExampleTemplate,
-    onNewBlank: startBlankStudy,
+    onAdoptExample: appController.actions.onAdoptExample,
+    onNewBlank: appController.actions.onNewBlank,
     onKeepExploringExample: () => {},
-    onExportProject: exportProjectBackup,
+    onExportProject: appController.actions.onExportProject,
     onVisibilityChange: shell.setGuidedAsideVisible,
   });
   shell.setExplainStepHandler((stepId) => guidedController.explain(stepId));
@@ -22797,20 +23597,20 @@ function init() {
       // fresh projection as the shell. Passing it here keeps them from
       // rebuilding workflow or next-decision state locally.
       workflowProgress: currentWorkflowProgress(),
+      // AUD-10's copy-groups path mutates `assays` in place via
+      // store.setPath, so the assay-change re-render subscriber below never
+      // fires for it and a workflowProgress snapshot taken once up front
+      // would go stale; steps needing a post-mutation read call this instead.
+      getWorkflowProgress: () => currentWorkflowProgress(),
       experience: loadOnboarding().experience,
-      onNewBlank: startBlankStudy,
-      onAdoptExample: adoptExampleTemplate,
-      onOpenExample: openExampleStudy,
-      guidedStatus: guidedProgressState,
-      getGuidedStatus: () => guidedProgressState,
+      ...appController.actions,
+      guidedStatus: appController.getGuidedState(),
+      getGuidedStatus: () => appController.getGuidedState(),
       onStartGuided: () => guidedController.start(),
       onResumeGuided: () => guidedController.resume(),
       onRestartGuided: () => guidedController.restart(),
       onExplainGuided: explainGuided,
       kbIssueCount: kb.issues.length,
-      onExportProject: exportProjectBackup,
-      onImportProject: importProjectBackup,
-      onClearAllStorage: clearAllStoredData,
     });
   }
 
@@ -22852,36 +23652,27 @@ function init() {
     }
   });
 
-  // Debounced: saving on every keystroke would fill the 5-slot ring buffer
-  // with near-duplicate snapshots of the last few characters typed, rather
-  // than the last 5 genuinely distinct states the ring buffer exists to
-  // preserve as history.
-  let saveTimer = null;
+  // Split out of the debounced autosave subscriber that moved into
+  // core/appController.js's startAutosave(): this push has no persistence
+  // side effect at all, it is a pure view refresh, and it depends on
+  // kb/conformance state (currentWorkflowProgress) that stays here rather
+  // than being injected into appController.
   store.subscribe(() => {
     if (shell && typeof shell.setWorkflowProgress === 'function') {
       shell.setWorkflowProgress(currentWorkflowProgress());
     }
-    setSaveState({ status: 'saving', error: null });
-    // Run after the state transition: if this bookkeeping write fails, its
-    // visible failed state must not be overwritten immediately by "saving".
-    markChanged({ onQuotaExceeded: reportStorageFailure });
-    if (saveTimer) window.clearTimeout(saveTimer);
-    saveTimer = window.setTimeout(() => {
-      const savedId = saveExperiment(store.get(), { onQuotaExceeded: reportStorageFailure });
-      if (savedId) {
-        setSaveState({ status: 'saved', savedAt: new Date().toISOString(), error: null });
-        if (shell && typeof shell.setRecoveryEntries === 'function') {
-          shell.setRecoveryEntries(recoveryEntries());
-        }
-      } else {
-        reportStorageFailure();
-      }
-    }, AUTOSAVE_DEBOUNCE_MS);
   });
+
+  // Debounced: saving on every keystroke would fill the 5-slot ring buffer
+  // with near-duplicate snapshots of the last few characters typed, rather
+  // than the last 5 genuinely distinct states the ring buffer exists to
+  // preserve as history. See core/appController.js's startAutosave/
+  // flushAutosave for the mechanics.
+  appController.startAutosave();
 
   // The one thing allowed to open itself on load, and only because the user
   // explicitly left a walkthrough paused mid-way on a previous visit.
-  if (guidedProgressState.status === 'active') guidedController.resume();
+  if (appController.getGuidedState().status === 'active') guidedController.resume();
 }
 
 init();
