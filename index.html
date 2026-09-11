@@ -163,6 +163,64 @@ body {
   min-height: 100vh;
 }
 
+/* Practice-tab banner (shell.js's isSandbox branch, ?demo=1 only): a
+   persistent, non-dismissable strip so this tab is never mistaken for the
+   user's real one -- there is deliberately no dismiss control. Sits above
+   the header in normal flow rather than joining its sticky stack: it scrolls
+   away with the page instead of staying pinned, which is a deliberate
+   simplification that keeps it out of the ResizeObserver-published
+   --shell-*-height sizing math a few hundred lines down (see shell.js's own
+   comment on that calculation). Reuses the same solid accent-background /
+   accent-ink-text pill already used elsewhere in this file for "this one is
+   active/special" (the release-notes nav item, workflow-strip's Continue
+   action) rather than inventing a new color language for one more notice. */
+.sandbox-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px clamp(18px, 2.4vw, 28px);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-ink) 25%, transparent);
+  color: var(--accent-ink);
+  background: var(--accent);
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.sandbox-banner-text {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.sandbox-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sandbox-banner-action {
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--accent-ink) 45%, transparent);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--accent-ink);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sandbox-banner-action:hover {
+  background: color-mix(in srgb, var(--accent-ink) 15%, transparent);
+}
+
+.sandbox-banner-action:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+
 .shell-header {
   display: flex;
   align-items: center;
@@ -1210,6 +1268,21 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+/* The example-study entry (ui/steps/home.js's appendExampleLink) is the one
+   card on this page that earns a featured treatment: it used to be a tiny
+   text link a new visitor could miss entirely. This base-layer rule is
+   restated near the redesigned .home-card block below (~2607), which is the
+   one that actually wins the cascade for border-color/background -- see
+   that block's own comment. */
+.home-card-featured {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.home-card-featured:hover {
+  border-color: var(--accent);
+}
+
 .home-card-icon {
   font-size: 34px;
   line-height: 1;
@@ -1659,7 +1732,8 @@ button:focus-visible {
 }
 
 /* The Guide step (ui/steps/guide.js): a readable, max-width prose column. */
-.guide-tour-button {
+.guide-tour-button,
+.guide-practice-tab-button {
   margin-bottom: 16px;
 }
 
@@ -2657,6 +2731,30 @@ textarea:focus-visible {
 .home-card-title { color: var(--ink); font-size: 17px; font-weight: 720; }
 .home-card-body, .guide-para { color: var(--muted); }
 
+/* This block (from ~2600) is the later layer that actually wins .home-card's
+   own border-color/background over the plainer declarations near :1163 --
+   equal specificity, later in source, so it is what a browser really paints.
+   The featured card's accent treatment has to be restated here too, or it
+   would be silently overridden back to an ordinary card the moment this
+   block loads. */
+.home-card-featured {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+}
+
+.home-card-featured:hover {
+  border-color: var(--accent);
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.home-card-featured .home-card-icon {
+  background: var(--accent);
+}
+
+.home-card-featured .home-card-glyph {
+  color: var(--accent-ink);
+}
+
 .planned-box,
 .advice-section,
 .spectral-view,
@@ -2909,6 +3007,20 @@ td, th { border-color: var(--line); }
 .shell-restore-action { font-size: 12.5px; }
 .shell-restore-row { display: flex; align-items: center; gap: 2px; }
 .shell-restore-row .shell-restore-action { flex: 1; min-width: 0; }
+/* Second line inside the restore button (shell.js's renderRecoveryEntries),
+   holding restoreWhenLabel()'s output. `display: block` is what actually
+   stacks it under the title line -- a bare <span> is inline and would just
+   run on after the title text instead. .shell-utility-action's min-height is
+   a *minimum* (app.css:2880-2892), not a fixed height, and neither it nor
+   .shell-restore-action clamps overflow or forces nowrap, so the button
+   grows to fit this extra line with no other layout change needed. */
+.shell-restore-when {
+  display: block;
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 550;
+}
 .shell-restore-delete {
   font: inherit;
   font-size: 13px;
@@ -5478,6 +5590,13 @@ function resolveInitialExperiment(persist, createEmptyStudy, { onUnreadable } = 
  * @param {() => object} deps.createEmptyStudy - core/schema.js's emptyExperiment.
  * @param {boolean} [deps.isPersisted] - from resolveInitialExperiment's result;
  *   seeds the initial save-state status.
+ * @param {boolean} [deps.isSandbox=false] - core/storageScope.js's IS_SANDBOX,
+ *   true only in the `?demo=1` practice tab. Injected rather than imported
+ *   (like every other collaborator here -- see the header comment) so a test
+ *   can construct a controller in either mode without a real `location`.
+ *   Defaults to false -- the safe reading when nobody says otherwise is "this
+ *   is somebody's real study" -- and main.js is the one caller that passes the
+ *   real value. openExampleStudy's guard (below) is gated on this.
  * @param {{ setTimeout: Function, clearTimeout: Function }} [deps.timers]
  * @param {() => string} [deps.now] - returns the ISO timestamp used for `savedAt`.
  * @param {{ error: Function, warn: Function }} [deps.logger]
@@ -5491,6 +5610,7 @@ function createAppController({
   createExampleStudy,
   createEmptyStudy,
   isPersisted = false,
+  isSandbox = false,
   timers = {
     setTimeout: (...args) => window.setTimeout(...args),
     clearTimeout: (...args) => window.clearTimeout(...args),
@@ -5509,6 +5629,37 @@ function createAppController({
 
   function attachShell(nextShell) {
     shell = nextShell;
+  }
+
+  /**
+   * Stamp `meta.updatedAt` (from the injected `now`, so this is exactly as
+   * fake-clock-testable as `saveState.savedAt` already is) on a COPY of
+   * `experiment`, for handing to persist.saveExperiment -- never on the
+   * object living in the store.
+   *
+   * Why here and not in persist.js: persist.js's saveExperiment docstring
+   * says plainly that module has no clock anywhere and is deliberately
+   * ignorant of document shape (slot ids are "not keyed by
+   * experiment.meta.id") -- it cannot stamp a field it never looks at.
+   * appController already owns `now`, so this is the one place both the
+   * save and the stamp happen together.
+   *
+   * CRITICAL, and the one thing that must never regress: this returns a
+   * NEW object rather than mutating `experiment` in place. Writing the
+   * timestamp back into the LIVE study (e.g. via store.patch/replace)
+   * would run it through the same notification path startAutosave's
+   * subscriber listens on to schedule the next debounced save -- so a
+   * mutating version of this helper would have every save notify
+   * subscribers, which schedules another autosave, which stamps and
+   * notifies again: an unbounded loop. Returning a copy means the
+   * timestamp only ever reaches persist (and, through it, the Restore
+   * list, which reads the persisted slot's raw meta.updatedAt directly);
+   * the in-memory study just picks up its own updatedAt the next time it
+   * is loaded fresh from storage, same as every other field persist.js
+   * round-trips.
+   */
+  function withSaveStamp(experiment) {
+    return { ...experiment, meta: { ...(experiment.meta || {}), updatedAt: now() } };
   }
 
   function notifyToast(message) {
@@ -5555,12 +5706,28 @@ function createAppController({
       const title = typeof raw?.meta?.title === 'string' && raw.meta.title.trim()
         ? raw.meta.title.trim()
         : 'Untitled study';
-      return { id, title };
+      // Read raw, un-migrated meta.updatedAt directly (this function never
+      // calls migrate()) rather than fabricating one: every slot saved
+      // before this change genuinely has no updatedAt, and reporting `null`
+      // honestly for those is the point, not an edge case to paper over. A
+      // hand-edited or corrupt slot whose updatedAt survived as some other
+      // type (a number, an object) is normalized to `null` the same way,
+      // since it is not a value anything downstream should render as a date.
+      const savedAt = typeof raw?.meta?.updatedAt === 'string' ? raw.meta.updatedAt : null;
+      return { id, title, savedAt };
     });
   }
 
   function exportProjectBackup() {
-    persist.exportToFile(store.get(), projectFilename(store.get()));
+    // Stamped like any other write. Without this the downloaded file carries
+    // whatever updatedAt the in-memory study happens to hold -- which, for a
+    // study created and edited in this session and never reloaded, is still
+    // the creation time from emptyExperiment(). Someone importing that file
+    // an hour later would get a document claiming it had not been touched
+    // since it was made, and a workspace list sorting by recency would put it
+    // in the wrong place. The export IS the moment this copy was written, so
+    // that is what it should say.
+    persist.exportToFile(withSaveStamp(store.get()), projectFilename(store.get()));
     persist.markExported({ onQuotaExceeded: reportStorageFailure });
     notifyToast('Project backup downloaded.');
   }
@@ -5646,7 +5813,7 @@ function createAppController({
       );
       return false;
     }
-    const savedId = persist.saveExperiment(store.get(), { onQuotaExceeded: reportStorageFailure });
+    const savedId = persist.saveExperiment(withSaveStamp(store.get()), { onQuotaExceeded: reportStorageFailure });
     notifyRecoveryEntries();
     if (!savedId) {
       reportPersistentLifecycleFailure(
@@ -5665,25 +5832,67 @@ function createAppController({
   // copied, or disowned before the visitor may type in it. `origin: 'example'`
   // still exists in the schema so older autosaves keep loading unchanged.
   function openExampleStudy() {
+    // HARD REFUSAL, first statement, unconditional. This function replaces
+    // the entire in-memory study -- the one truly destructive operation in
+    // this whole module -- so the guard belongs INSIDE it, not at its call
+    // sites. A call-site check only makes TODAY's callers safe (main.js no
+    // longer wires a real-tab control to this); it says nothing about a
+    // future button, a mis-merge that re-points a real-tab entry point back
+    // at openExampleStudy, or someone invoking
+    // controller.actions.onOpenExample()/onReset() from the console. Putting
+    // the check here instead makes the study-replacing path itself
+    // unreachable outside the practice tab, no matter how it gets invoked --
+    // the only thing a call-site check can never guarantee.
+    if (!isSandbox) {
+      logger.error(
+        'openExampleStudy: refused outside the practice tab (?demo=1). This call would replace the real study in place; it is a no-op here on purpose.'
+      );
+      return false;
+    }
+
+    // A pending debounced autosave timer holds a closure over store.get()
+    // that fires 500ms after the *last* edit, whenever that lands relative to
+    // this call. Without flushing it first, store.replace() below runs while
+    // that timer is still pending, and it then fires AFTER the replace, reads
+    // store.get() fresh (now the example), and persists the example over the
+    // ring slot that should hold the practice edit the user made just before
+    // clicking reset -- the exact bug documented on startBlankStudy above,
+    // reproduced here because this function has the identical shape
+    // (read-then-replace across a debounce window). startBlankStudy already
+    // calls flushAutosave() for this reason; this was the same latent bug,
+    // just not yet triggered because nothing had exercised this path with a
+    // pending timer.
+    flushAutosave();
+
     // Preserve the exact current state synchronously, before replace() can
     // expose example data to the autosave subscriber. This snapshot is
-    // protected from normal ring eviction: browsing or editing demo data can
-    // never delete user-entered work. If durable preservation is unavailable,
+    // protected from normal ring eviction: since this function is now only
+    // reachable from the sandbox tab, "the current state" here is always the
+    // sandbox's own prior practice activity, never the user's real study --
+    // but the protection is the same one openExampleStudy always used, so
+    // browsing or editing the example still can never delete whatever
+    // practice work came before it. If durable preservation is unavailable,
     // do not switch workspaces at all.
-    const protectedId = persist.saveExperiment(store.get(), {
+    const protectedId = persist.saveExperiment(withSaveStamp(store.get()), {
       onQuotaExceeded: reportStorageFailure,
       protectFromAutomaticEviction: true,
     });
     if (!protectedId) {
       reportPersistentLifecycleFailure(
-        'Could not preserve your current study, so the example was not opened. Download a project backup or free storage, then try again.'
+        'Could not preserve your current practice state, so the example was not reopened. Download a project backup or free storage, then try again.'
       );
       return false;
     }
     const example = createExampleStudy();
     store.replace(withOrigin(example, 'template'));
     notifyRecoveryEntries();
-    notifyToast('Opened the example study. Your study was preserved in Restore and demo activity cannot remove it.');
+    // Pre-sandbox this toast said "Your study was preserved in Restore" --
+    // accurate when this function could be called from the real tab and
+    // really did displace someone's own study. Now that the guard above makes
+    // that unreachable, the only thing this ever does is reset the PRACTICE
+    // tab back to the shipped example, so the copy has to talk about practice
+    // activity, not "your study" (there is no other study here to preserve).
+    notifyToast('Reset to the example study. Your previous practice activity was preserved in Restore.');
     return true;
   }
 
@@ -5705,7 +5914,7 @@ function createAppController({
    */
   function startBlankStudy() {
     flushAutosave();
-    const protectedId = persist.saveExperiment(store.get(), {
+    const protectedId = persist.saveExperiment(withSaveStamp(store.get()), {
       onQuotaExceeded: reportStorageFailure,
       protectFromAutomaticEviction: true,
     });
@@ -5771,7 +5980,7 @@ function createAppController({
   let saveTimer = null;
 
   function performAutosave() {
-    const savedId = persist.saveExperiment(store.get(), { onQuotaExceeded: reportStorageFailure });
+    const savedId = persist.saveExperiment(withSaveStamp(store.get()), { onQuotaExceeded: reportStorageFailure });
     if (savedId) {
       setSaveState({ status: 'saved', savedAt: now(), error: null });
       notifyRecoveryEntries();
@@ -5813,6 +6022,14 @@ function createAppController({
   // recoverable instead of making a "start over" action a data-loss trap.
   // Spread this same object into both renderShell's options and every
   // step's render() options (main.js) -- shared names, single source.
+  //
+  // onReset and onOpenExample are still both aliases of the same
+  // openExampleStudy, kept as two names because existing callers use both --
+  // but in the real tab they are now unreachable-by-design rather than merely
+  // unused: the UI no longer wires either to a real-tab control, and even if
+  // it did (or a console call invoked one directly), openExampleStudy's own
+  // isSandbox guard refuses outside the practice tab regardless of which
+  // name was used to reach it.
   const actions = {
     onReset: openExampleStudy,
     onNewBlank: startBlankStudy,
@@ -6459,12 +6676,27 @@ const DEFAULT_NAMING_TEMPLATE =
 
 function emptyExperiment() {
   const firstId = shortId();
+  // meta.id uses uuid(), NOT shortId(): shortId's collision space is "large
+  // but non-zero" (see importValidate.js's sanitizeAssay docstring, which
+  // already refuses to invent a fallback id for exactly that reason), and
+  // this id is a document identity that must survive an export/import round
+  // trip and later key a workspace index -- a collision here silently
+  // merges two unrelated studies' history, not just two assays in one
+  // in-memory session. uuid() falls back to a Math.random()-seeded v4 shape
+  // under file:// (see ids.js), which is still fine for this purpose.
+  const now = new Date().toISOString();
   return {
     schemaVersion: SCHEMA_VERSION,
     meta: {
-      id: null,
-      createdAt: null,
-      updatedAt: null,
+      id: uuid(),
+      // ISO 8601 strings, never Date objects: persist.js round-trips the
+      // whole document through JSON.stringify/parse and tests assert a
+      // strict deepEqual across that round trip, which compares
+      // prototypes -- a Date survives the stringify but comes back as a
+      // string, so storing a Date here would make a freshly created study
+      // fail that comparison the very first time it was saved and reloaded.
+      createdAt: now,
+      updatedAt: now,
       title: '',
       origin: 'blank',
     },
@@ -6762,6 +6994,44 @@ function normalizeStudyContext(current) {
   return isValid ? current : { ...current, studyContext: normalized };
 }
 
+// Saved studies from before meta.id existed carry `id: null` (or never had
+// the key at all -- emptyExperiment() from before this change always wrote
+// `null` explicitly, but a hand-edited or hostile file need not have). Mint
+// one at the load boundary rather than in a migration step so that MOVING
+// through schema versions and MERELY RE-LOADING an already-current save are
+// treated the same way: both are "this document reached the app without a
+// real id" and both get exactly one, ever -- and, critically, exactly once:
+// re-running migrate() on the already-backfilled result must find a real
+// string id already there and stop, or a document's identity would change
+// on every load, which defeats the entire point of an id that is supposed
+// to key a workspace index or survive an export/import round trip.
+//
+// This normalizer only ever touches meta.id -- createdAt is deliberately
+// left alone. An id is an arbitrary label with no truth value: minting one
+// the first time a legacy document is opened costs nothing and is
+// indistinguishable from having minted it at creation, because nothing
+// about the document's history depended on what the label says. A creation
+// date is not a label, it is a CLAIM about the past: stamping "now" onto a
+// study a user actually wrote months ago would assert something false about
+// it, in the same register importValidate.js already refuses to invent an
+// assay id it cannot justify (see sanitizeAssay's docstring) -- some fields
+// degrade to a reasonable default and some fields must stay honestly
+// unknown. updatedAt likewise needs no backfill here: every save now stamps
+// it (see appController.js's withSaveStamp -- persist.js has no clock and
+// deliberately knows nothing about document shape), so a document reaching
+// this boundary without one is
+// either brand new (already stamped by emptyExperiment()) or about to be
+// stamped by the very save that reads it back in.
+//
+// Follows the same idiom as normalizeStudyContext: preserve the original
+// reference when the field is already valid, so an already-current,
+// already-identified save keeps the no-op identity contract intact.
+function normalizeStudyIdentity(current) {
+  const meta = current && current.meta && typeof current.meta === 'object' ? current.meta : {};
+  if (typeof meta.id === 'string' && meta.id) return current;
+  return { ...current, meta: { ...meta, id: uuid() } };
+}
+
 function migrate(obj) {
   let current = obj;
   let version = obj && typeof obj.schemaVersion === 'number' ? obj.schemaVersion : 0;
@@ -6791,7 +7061,15 @@ function migrate(obj) {
   // them. Do it at the boundary every persisted experiment crosses instead.
   // Each normalizer preserves the original object when its own data is valid,
   // retaining the no-op identity contract for already-valid current saves.
+  //
+  // normalizeStudyIdentity runs BEFORE the meta.origin block below: that
+  // block early-returns as soon as origin is already one of STUDY_ORIGINS,
+  // and a legacy save with a valid origin but no id is exactly the common
+  // case (every pre-this-change emptyExperiment() wrote `origin: 'blank'`
+  // immediately). Running identity normalization after that return would
+  // silently skip the backfill for precisely the documents that need it.
   current = normalizeStudyContext(current);
+  current = normalizeStudyIdentity(current);
   const meta = current && current.meta && typeof current.meta === 'object' ? current.meta : {};
   if (STUDY_ORIGINS.has(meta.origin)) return current;
   return { ...current, meta: { ...meta, origin: 'user' } };
@@ -7204,6 +7482,89 @@ function validateImportedExperiment(migrated) {
     issues,
   };
 }
+  // ---- src/core/storageScope.js ----
+// Named storage scopes: which set of localStorage keys this tab is allowed to
+// touch.
+//
+// The app keeps ONE study at a time (core/store.js holds a single mutable
+// root), so "let me poke at the example without risking my own work" has no
+// in-tab answer -- opening the example used to replace the study on screen.
+// The answer is a second TAB: `index.html?demo=1` opens the same app against a
+// separate set of keys, and the tab you came from is never navigated away, so
+// your study is still sitting there exactly as you left it.
+//
+// Resolved from location.search rather than the hash because the hash is
+// already the router's address space (core/router.js's `#/step-id`), and a
+// sandbox URL has to be able to carry a route too: `?demo=1#/guide` works,
+// `#demo=1#/guide` does not.
+//
+// This resolves a NAMED SCOPE, not a demo yes/no, deliberately. A future
+// multi-workspace feature (several studies accumulated in one place) is "more
+// named scopes plus an index"; resolving a name here rather than a boolean is
+// the difference between adding one later and rewriting every caller. Today
+// exactly two names exist: '' (your own work) and 'demo' (the practice tab).
+//
+// HONEST LIMIT, and it must not be overstated anywhere in the UI: localStorage
+// is one bucket per origin, so this is isolation by key prefix, not a separate
+// store. It is a strong convention, not a wall -- any future code that writes
+// an unprefixed key leaks across scopes. (The Core Facility Tracker, which this
+// pattern is ported from, could open a whole separate IndexedDB *database* and
+// so could promise more. We cannot, and say so.)
+
+const APP_PREFIX = 'micronaut.';
+
+// Keys every scope deliberately SHARES. The practice tab should look like the
+// user's own app, and a remembered light/dark choice is not state worth
+// isolating -- it carries no study data and losing it costs nothing.
+const SHARED_KEYS = new Set(['micronaut.theme']);
+
+/**
+ * Map a query string onto a scope name. Total: any parse failure, and any
+ * value other than the one recognized flag, resolves to the unscoped ''
+ * rather than throwing -- a malformed URL must never be able to stop the app
+ * booting, and must never be able to resolve to a scope by accident.
+ */
+function resolveStorageScope(search) {
+  try {
+    const params = new URLSearchParams(String(search || ''));
+    return params.get('demo') === '1' ? 'demo' : '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Build a key-namespacing function for one scope.
+ *
+ * Exported as a factory because STORAGE_SCOPE below is a module constant
+ * resolved at import time and cannot be flipped from a test -- makeNsKey('demo')
+ * is how the scoped branch gets proven under `node --test`, where there is no
+ * `location` at all and the resolved scope is therefore always ''.
+ *
+ * The scope name is inserted AFTER the shared `micronaut.` prefix
+ * ('micronaut.v1.ring' -> 'micronaut.demo.v1.ring') so every key the app owns
+ * still groups under one namespace when someone opens DevTools. It also cannot
+ * collide: 'micronaut.demo.v1.ring'.startsWith('micronaut.v1.') is false, which
+ * is what keeps persist.js's prefix-sweeping clearAll() from reaching across
+ * scopes in either direction.
+ */
+function makeNsKey(scope) {
+  return function nsKeyForScope(key) {
+    if (!scope || SHARED_KEYS.has(key)) return key;
+    const bare = key.startsWith(APP_PREFIX) ? key.slice(APP_PREFIX.length) : key;
+    return `${APP_PREFIX}${scope}.${bare}`;
+  };
+}
+
+const STORAGE_SCOPE = resolveStorageScope(
+  typeof location !== 'undefined' ? location.search : ''
+);
+
+/** True in the practice tab. Sugar over the one scope name that has UI attached. */
+const IS_SANDBOX = STORAGE_SCOPE === 'demo';
+
+/** Namespace a key for THIS tab's scope. The only nsKey app code should use. */
+const nsKey = makeNsKey(STORAGE_SCOPE);
   // ---- src/core/persist.js ----
 
 // localStorage is a CONVENIENCE, never the record of truth: two users on a
@@ -7217,7 +7578,21 @@ function validateImportedExperiment(migrated) {
 // in-memory fake, and a fake that throws QuotaExceededError.
 
 const STORAGE_SCHEMA_VERSION = 1;
-const STORAGE_PREFIX = `micronaut.v${STORAGE_SCHEMA_VERSION}.`;
+// Namespaced through nsKey so the practice tab (?demo=1) reads and writes a
+// distinct ring, index and change counter from the user's own study --
+// without this, opening the example would autosave into (and evict slots
+// from) the same ring the real study relies on for recovery. RING_INDEX_KEY,
+// PROTECTED_SLOTS_KEY, CHANGES_KEY and slotKey() below all derive from this
+// constant, so they inherit the scoping for free.
+//
+// The non-collision property clearAll()'s prefix sweep depends on holds in
+// both directions: 'micronaut.demo.v1.ring'.startsWith('micronaut.v1.') is
+// false (the scoped key does not start with the unscoped prefix), and
+// 'micronaut.v1.ring'.startsWith('micronaut.demo.v1.') is false (the
+// unscoped key does not start with the scoped prefix either). So a clearAll()
+// run in one scope's STORAGE_PREFIX can never delete -- or leave behind --
+// the other scope's keys, in either direction.
+const STORAGE_PREFIX = nsKey(`micronaut.v${STORAGE_SCHEMA_VERSION}.`);
 
 const RING_SIZE = 5;
 const RING_INDEX_KEY = STORAGE_PREFIX + 'ring';
@@ -7628,8 +8003,12 @@ function buildFeedbackReport({ currentStepId, kbIssueCount, userAgent, experimen
 // second registry here. Storage is a convenience and every read/write is
 // total so a blocked preference store cannot prevent the app from booting.
 
+
 const GUIDED_PROGRESS_VERSION = 1;
-const GUIDED_PROGRESS_KEY = `micronaut.guidedProgress.v${GUIDED_PROGRESS_VERSION}`;
+// Namespaced so the practice tab tracks its own walkthrough progress rather
+// than overwriting (or resuming) the real study's -- an example run through
+// the guide must not leave the user's own tab paused mid-step, or vice versa.
+const GUIDED_PROGRESS_KEY = nsKey(`micronaut.guidedProgress.v${GUIDED_PROGRESS_VERSION}`);
 
 const STATUSES = new Set(['not-started', 'active', 'paused', 'completed']);
 const RECORD_KEYS = ['version', 'status', 'currentStepId', 'completedStepIds', 'completedAt'];
@@ -7961,9 +8340,14 @@ function kbMarker(kb, canonical) {
 //
 // Core module: pure logic only, no DOM, no engine/ui imports, no network.
 
-const STAGE_KEY = 'micronaut.onboarding.stage';
-const EXPERIENCE_KEY = 'micronaut.onboarding.experience';
-const COMPLETED_KEY = 'micronaut.onboarding.completed';
+
+// Namespaced so the practice tab's walkthrough answers (stage/experience) and
+// its completed-gate flag never leak into the user's own tab: without this, a
+// visitor poking at the example would either permanently dismiss their own
+// onboarding gate or overwrite their real stage/experience choices.
+const STAGE_KEY = nsKey('micronaut.onboarding.stage');
+const EXPERIENCE_KEY = nsKey('micronaut.onboarding.experience');
+const COMPLETED_KEY = nsKey('micronaut.onboarding.completed');
 
 const ONBOARDING_STAGES = ['idea', 'designing', 'acquiring'];
 const ONBOARDING_LEVELS = ['novice', 'occasional', 'frequent'];
@@ -15833,6 +16217,46 @@ function createIcon(name, className) {
   }
   return svg;
 }
+  // ---- src/ui/newTab.js ----
+// Open a URL in a new browser tab by synthesising a click on a real <a>,
+// rather than calling window.open.
+//
+// Two reasons, both about the practice tab (core/storageScope.js):
+//
+//   - A genuine anchor activation reads to the browser as a user navigation,
+//     so a popup blocker does not eat it the way it can eat window.open.
+//
+//   - rel="noopener" survives. That matters here beyond the usual advice:
+//     `?demo=1` is SAME-ORIGIN, so without it the practice tab would receive a
+//     live `window.opener` handle back into a tab holding the user's real work.
+//
+// There is deliberately NO blocked-popup fallback. With noopener, window.open()
+// returns null unconditionally, so the usual `if (!w) { ... }` detection cannot
+// tell "blocked" from "fine" -- which is exactly why this picks a path blockers
+// do not intercept instead of trying to detect one they do.
+//
+// `doc` is injectable for the same reason ui/feedbackHandoff.js injects its
+// opener: so a test can assert the URL and the rel/target attributes against
+// the shared DOM stub, with no real browser involved.
+
+function openInNewTab(url, { doc = typeof document !== 'undefined' ? document : null } = {}) {
+  if (!doc || typeof doc.createElement !== 'function' || !doc.body) return false;
+  const anchor = doc.createElement('a');
+  anchor.href = url;
+  anchor.target = '_blank';
+  anchor.rel = 'noopener noreferrer';
+  doc.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  return true;
+}
+
+/**
+ * The URL of the practice tab, relative to whatever path the app is being
+ * served from. Relative on purpose: the same string has to work under
+ * file:// (one downloaded index.html), on a project subpath, and on localhost.
+ */
+const SANDBOX_URL = '?demo=1';
   // ---- src/ui/shell.js ----
 // Global UI shell. Project persistence and readiness are supplied by main.js;
 // this module only renders those contracts and routes user actions back out.
@@ -15849,8 +16273,19 @@ const MEASUREMENT_TONE_CLASS = Object.freeze({
   neutral: 'is-not-started',
 });
 
+// UNSCOPED on purpose (core/storageScope.js's nsKey is deliberately NOT
+// applied here): the practice tab (?demo=1) should look like the user's own
+// app, and a remembered light/dark choice carries no study data, so there is
+// nothing about it worth isolating per tab. storageScope.js's own SHARED_KEYS
+// already treats this exact key as shared, so nsKey(THEME_KEY) would resolve
+// to the same unscoped key anyway -- left unscoped explicitly here so that
+// fact doesn't have to be re-derived by reading storageScope.js.
 const THEME_KEY = 'micronaut.theme';
-const NAV_COLLAPSED_KEY = 'micronaut.navCollapsed';
+// SCOPED, unlike THEME_KEY above: nav-collapsed is ordinary per-tab layout
+// state, not a preference worth sharing on purpose, so it gets the default
+// treatment -- namespaced so collapsing the rail in one tab can never
+// silently flip it in the other.
+const NAV_COLLAPSED_KEY = nsKey('micronaut.navCollapsed');
 
 function readPreference(key) {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -15879,6 +16314,50 @@ function saveLabel(saveState) {
   if (seconds < 10) return 'Saved locally · just now';
   if (seconds < 60) return `Saved locally · ${seconds}s ago`;
   return `Saved locally · ${Math.round(seconds / 60)}m ago`;
+}
+
+// The one absolute-time complement to saveLabel's relative-only vocabulary
+// above. saveLabel never needs an upper bound because it is read live off the
+// header's own indicator -- the save it describes just happened. A slot in
+// Restore is a different animal: it can be seconds old or weeks old, and
+// "meta.updatedAt" on a really old slot has no `savedAt` at all (any slot
+// written before that field existed) or is stringified nonsense (a corrupted
+// or hand-edited record), neither of which is this function's job to notice
+// -- it always renders *something* sane, even '' for "say nothing".
+// RESTORE_ABSOLUTE_AFTER_HOURS is the cutover from "relative to now" to "a
+// real calendar date": past a day, "19h ago" stops being easier to place than
+// the date itself, so this trades relative for absolute rather than letting
+// the relative count climb into "312h ago" territory.
+const RESTORE_ABSOLUTE_AFTER_HOURS = 24;
+
+// `now` is injectable for the same reason appController.js injects its own
+// clock: without it these labels can only be tested against the wall clock,
+// which means a test asserting an exact string ('45s ago') races the machine
+// -- if more than a second passes between the test building its timestamp and
+// this function reading Date.now(), the assertion flips to '46s ago' and the
+// suite fails for a reason that has nothing to do with the code. That is not
+// a hypothetical; it showed up once under parallel load while this was being
+// written. Production callers pass nothing and get the real clock.
+function restoreWhenLabel(iso, { now = () => Date.now() } = {}) {
+  if (typeof iso !== 'string' || !iso) return '';
+  const date = new Date(iso);
+  // Number.isNaN, not the global isNaN: a genuinely invalid Date's getTime()
+  // is NaN, and Number.isNaN doesn't coerce first the way the global one
+  // does -- same guard saveLabel already relies on above.
+  if (Number.isNaN(date.getTime())) return '';
+  const seconds = Math.max(0, Math.floor((now() - date.getTime()) / 1000));
+  if (seconds < 10) return 'just now';
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < RESTORE_ABSOLUTE_AFTER_HOURS) return `${hours}h ago`;
+  // toLocaleDateString with no timezone option reads the runtime's own local
+  // clock (the same "local by definition" property the module doc for this
+  // file's date rules elsewhere in this codebase relies on) -- deliberately
+  // no time-of-day component, since once a saved version is a day old or
+  // more, which day it was matters far more than which second.
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 // `steps` is router.steps (every route, including the utility/guide ones);
@@ -15916,6 +16395,10 @@ function renderShell(root, store, router, options = {}) {
   const {
     onReset, onNewBlank, onAdoptExample, onExportProject, onImportProject,
     onRestoreRecovery, onDeleteRecovery, kbIssueCount,
+    // Injected (defaulting to the real IS_SANDBOX) so both the practice-tab
+    // and real-tab branches of the banner below are exercisable against the
+    // DOM stub without a real `location.search` to resolve against.
+    isSandbox = IS_SANDBOX,
   } = options;
   // Missing lifecycle state must degrade conservatively. Only main can know
   // that a recovery slot was actually loaded or a save completed.
@@ -15925,6 +16408,64 @@ function renderShell(root, store, router, options = {}) {
   let themeNavButton = null;
   let featureWalkthroughHandler = null;
   root.textContent = '';
+
+  // Persistent, non-dismissable strip: the practice tab (?demo=1) must never
+  // be mistaken for the real one, so unlike every other notice in this file
+  // there is no close/dismiss control here at all. Built only when isSandbox
+  // is true, so the real tab's DOM carries no trace of it -- not just
+  // hidden, absent. Sits above the (sticky) header rather than joining its
+  // sticky stack: the ResizeObserver-published --shell-*-height custom
+  // properties a few hundred lines down assume exactly header + workflow
+  // strip + switcher, and this banner is practice-tab-only chrome that has
+  // no reason to earn a place in that shared calculation.
+  let sandboxBanner = null;
+  if (isSandbox) {
+    sandboxBanner = document.createElement('div');
+    sandboxBanner.className = 'sandbox-banner';
+    sandboxBanner.setAttribute('role', 'note');
+    const bannerText = document.createElement('span');
+    bannerText.className = 'sandbox-banner-text';
+    bannerText.textContent = 'Practice tab — example data, saved separately from your own study. Nothing you do here changes your work.';
+    sandboxBanner.appendChild(bannerText);
+
+    const bannerActions = document.createElement('div');
+    bannerActions.className = 'sandbox-banner-actions';
+
+    const whyButton = document.createElement('button');
+    whyButton.type = 'button';
+    whyButton.className = 'sandbox-banner-action';
+    whyButton.textContent = 'Why a separate tab?';
+    whyButton.addEventListener('click', () => {
+      // The real explanation, not a euphemism: this app holds exactly one
+      // study at a time, and a browser tab can only hold one page's worth of
+      // that state too -- so a second tab against its own storage is the
+      // only way to let you take the example apart with no risk to the
+      // study open in the other tab. No custom modal system exists in this
+      // file (see feedbackHandoff.js for the one place that owns one, which
+      // this is not part of), so this reuses the same window.alert this
+      // codebase already relies on elsewhere (ui/steps/naming.js) for a
+      // single-acknowledgement message.
+      window.alert(
+        'Micronaut keeps one study open at a time, and a browser tab can only hold one study\'s worth of that on screen -- so the only way to let you take the example apart with no risk is to give it its own tab.\n\n' +
+        'Close this tab whenever you are done: your study in the other tab is still open exactly as you left it. Anything you change here, in this practice tab, is kept too, so you can come back to it.'
+      );
+    });
+    bannerActions.appendChild(whyButton);
+
+    if (onReset) {
+      const resetButton = document.createElement('button');
+      resetButton.type = 'button';
+      resetButton.className = 'sandbox-banner-action';
+      resetButton.textContent = 'Reset to the example';
+      resetButton.addEventListener('click', () => {
+        if (window.confirm('Reset this practice tab back to the shipped example? Your current practice activity will be preserved in Restore.')) {
+          onReset();
+        }
+      });
+      bannerActions.appendChild(resetButton);
+    }
+    sandboxBanner.appendChild(bannerActions);
+  }
 
   const header = document.createElement('header');
   header.className = 'shell-header';
@@ -16032,9 +16573,21 @@ function renderShell(root, store, router, options = {}) {
   });
   document.addEventListener('pointerdown', (event) => { if (!utilities.contains(event.target)) closeMenu(); });
 
-  if (onReset) utilityMenu.appendChild(action('Reset to example study', () => {
-    if (window.confirm('Open the oregano example? Your current study will be preserved in Restore and demo activity cannot remove it.')) onReset();
-  }));
+  // This used to read "Reset to example study" and REPLACE the study on
+  // screen after a window.confirm -- onReset (core/appController.js's
+  // openExampleStudy) now refuses to run at all outside the practice tab, so
+  // that control would be a dead button here even with the confirm kept.
+  // Opening the practice tab (its own storage, ?demo=1) is the real
+  // replacement, and it displaces nothing on screen, so there is nothing
+  // left to confirm.
+  // Hidden inside the practice tab itself, where it would offer to open the
+  // tab you are already standing in. The banner's "Reset to the example"
+  // above is the equivalent control there.
+  if (!isSandbox) {
+    utilityMenu.appendChild(action('Open example in a practice tab', () => {
+      openInNewTab(SANDBOX_URL);
+    }));
+  }
   if (onExportProject) utilityMenu.appendChild(action('Export project backup', onExportProject));
   if (onImportProject) {
     const input = document.createElement('input');
@@ -16071,12 +16624,42 @@ function renderShell(root, store, router, options = {}) {
       const entryTitle = entry.title || 'Untitled study';
       const row = document.createElement('div');
       row.className = 'shell-restore-row';
-      const restore = action(`${index === 0 ? 'Latest: ' : ''}${entryTitle}`, () => {
+      const titleLine = `${index === 0 ? 'Latest: ' : ''}${entryTitle}`;
+      const restore = action(titleLine, () => {
         if (window.confirm('Restore this saved version? Your current work remains available in Restore.')) {
           onRestoreRecovery(entry.id);
         }
       }, 'shell-restore-action');
       restore.title = 'Restore this saved version';
+      // action() just set restore.textContent above, which (per its own doc
+      // comment) is a SINGLE text node -- action() is shared with four other
+      // menu items and isn't touched for this. appendChild here adds the
+      // timestamp as a SECOND node alongside it instead, which is exactly
+      // what lets app.css's .shell-restore-when put it on its own line below
+      // titleLine without any change to that shared helper.
+      // recoveryEntries() (appController.js) returns savedAt: null for any
+      // slot saved before that field existed, so '' here is not an edge case
+      // -- it is what every upgrading user's oldest slots look like on first
+      // load, and skipping the span entirely reproduces today's one-line row
+      // exactly for them.
+      const whenLabel = restoreWhenLabel(entry.savedAt);
+      if (whenLabel) {
+        const when = document.createElement('span');
+        when.className = 'shell-restore-when';
+        when.textContent = whenLabel;
+        // Screen readers compute a button's accessible name from its text
+        // content unless an aria-label overrides that -- and with two text
+        // nodes now inside `restore` (titleLine, then whenLabel with no
+        // separator between them), that computed name would run the two
+        // together verbatim, e.g. "Latest: Autophagy assay5m ago". aria-hidden
+        // here takes the second line out of that computation, and the
+        // explicit aria-label below puts the same two facts back in as one
+        // properly punctuated phrase instead -- so sighted and screen-reader
+        // users get the same information, just assembled differently.
+        when.setAttribute('aria-hidden', 'true');
+        restore.appendChild(when);
+        restore.setAttribute('aria-label', `${titleLine}, saved ${whenLabel}`);
+      }
       row.appendChild(restore);
       if (onDeleteRecovery) {
         const remove = document.createElement('button');
@@ -16438,7 +17021,7 @@ function renderShell(root, store, router, options = {}) {
   status.className = 'shell-status';
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
-  root.append(header, workflowStrip, switcher, body, footer, status);
+  root.append(...(sandboxBanner ? [sandboxBanner] : []), header, workflowStrip, switcher, body, footer, status);
 
   // Publishes the footer's real, current height so .shell-status and
   // .shell-main (app.css) can clear it exactly instead of duplicating a
@@ -16714,7 +17297,13 @@ const ADVICE_KIND_LABELS = { pitfall: 'Pitfall', tip: 'Tip' };
 // developer-facing text in front of a scientist for no benefit beyond what
 // the two tiers above already give; it stays reserved for whoever is
 // authoring or debugging a rule.
-const ADVISOR_DEBUG_KEY = 'micronaut.advisorDebug';
+//
+// Namespaced like every other key in this family: the debug flag is a
+// developer convenience toggled by hand in DevTools, and without scoping,
+// turning it on in the practice tab (or vice versa) would silently turn on
+// raw-predicate debug output in the OTHER tab too, since both would otherwise
+// read the exact same localStorage key.
+const ADVISOR_DEBUG_KEY = nsKey('micronaut.advisorDebug');
 
 function advisorDebugEnabled() {
   try {
@@ -18025,6 +18614,14 @@ const feedbackStep = {
 // completion-screen "Use as template" action already routes through
 // appController.js's isExampleOrigin-guarded adoptExampleTemplate, so it
 // needs no separate check of its own here.
+//
+// The example can now only be OPENED from the practice tab (?demo=1) --
+// openExampleStudy (core/appController.js) refuses to run outside it -- so a
+// study on THIS tab that is not already example-origin can never turn into
+// one by clicking Start here. The non-example fallback below therefore
+// carries a second action that opens the practice tab (ui/newTab.js), so the
+// walkthrough stays reachable from Guide instead of quietly becoming
+// unreachable the day the in-tab example was removed.
 
 
 /**
@@ -18093,6 +18690,11 @@ const guideStep = {
     onResumeGuided,
     onRestartGuided,
     onExplainGuided,
+    // Defaulted here, same pattern as ui/steps/home.js's render(): the real
+    // app always gets a working opener with no wiring required, while a test
+    // can inject its own spy in place of this default to assert the URL
+    // without a real browser (ui/feedbackHandoff.js:111's onOpen precedent).
+    onOpenExampleTab = openInNewTab,
   } = {}) {
     main.textContent = '';
 
@@ -18108,29 +18710,53 @@ const guideStep = {
     // 'example' alone would make Start permanently unreachable.
     const isExample = isExampleOrigin(store.get().meta?.origin);
     const guideStatus = guideGuidedStatus(guidedStatus, getGuidedStatus);
-    const guideAction = guideStatus === 'paused'
+    // isExample gates the WHOLE walkthrough action set, not just Start.
+    //
+    // Gating only Start (the first shape of this change) left a real hole:
+    // `paused` and `completed` were tested FIRST, so a non-example study still
+    // offered "Resume example walkthrough" / "Restart example walkthrough" --
+    // buttons that would run a tour OF THE EXAMPLE over somebody's own work,
+    // in the very tab this change exists to keep the example out of.
+    //
+    // That is not a pre-existing wart, it is new: before the practice tab, an
+    // `active`/`paused` record implied the example WAS loaded in this tab,
+    // because opening it in place was the only way to start a walkthrough at
+    // all. Now the example is never here, so any progress record surviving in
+    // this tab -- and upgrading users keep theirs, since the real scope's key
+    // is the unprefixed one it always was -- is guaranteed to describe a study
+    // the walkthrough was not written for. One check at the top is what makes
+    // "the walkthrough only runs on the example" true for every status rather
+    // than for one of them.
+    const guideAction = !isExample
       ? {
-          label: 'Resume example walkthrough',
-          callback: onResumeGuided,
-          title: 'Resume the optional seven-step example walkthrough without changing this study.',
+          label: 'Explain the workflow',
+          callback: onExplainGuided,
+          title: 'Open a contextual explanation without changing your study or walkthrough progress.',
+          offerPracticeTab: true,
         }
-      : guideStatus === 'completed'
+      : guideStatus === 'paused'
         ? {
-            label: 'Restart example walkthrough',
-            callback: onRestartGuided,
-            title: 'Restart the optional seven-step example walkthrough from its first step.',
+            label: 'Resume example walkthrough',
+            callback: onResumeGuided,
+            title: 'Resume the optional seven-step example walkthrough without changing this study.',
           }
-        : isExample && guideStatus === 'not-started'
+        : guideStatus === 'completed'
           ? {
-              label: 'Start example walkthrough',
-              callback: onStartGuided,
-              title: 'Open the optional seven-step example walkthrough without changing this study.',
+              label: 'Restart example walkthrough',
+              callback: onRestartGuided,
+              title: 'Restart the optional seven-step example walkthrough from its first step.',
             }
-          : {
-              label: 'Explain the workflow',
-              callback: onExplainGuided,
-              title: 'Open a contextual explanation without changing your study or walkthrough progress.',
-            };
+          : guideStatus === 'not-started'
+            ? {
+                label: 'Start example walkthrough',
+                callback: onStartGuided,
+                title: 'Open the optional seven-step example walkthrough without changing this study.',
+              }
+            : {
+                label: 'Explain the workflow',
+                callback: onExplainGuided,
+                title: 'Open a contextual explanation without changing your study or walkthrough progress.',
+              };
     const guideButton = document.createElement('button');
     guideButton.type = 'button';
     guideButton.className = 'copy-button guide-tour-button';
@@ -18140,6 +18766,26 @@ const guideStep = {
       if (typeof guideAction.callback === 'function') guideAction.callback('guide');
     });
     main.appendChild(guideButton);
+
+    // The walkthrough is otherwise unreachable from this study: Explain
+    // talks about it, but nothing on this page can start it. Opening the
+    // practice tab (its own storage, ?demo=1) is the one thing that still
+    // can.
+    if (guideAction.offerPracticeTab) {
+      const practiceTabButton = document.createElement('button');
+      practiceTabButton.type = 'button';
+      // Deliberately NOT carrying .guide-tour-button: that selector names the
+    // ONE button whose label reports the walkthrough's state, and both the
+    // browser suite (tests/test_e2e_flows.py) and guideStep.test.js read it
+    // with a first-match query. A second element wearing it would make those
+    // reads depend on DOM order. Styling comes from app.css listing this
+    // class alongside .guide-tour-button instead.
+    practiceTabButton.className = 'copy-button guide-practice-tab-button';
+      practiceTabButton.textContent = 'Try it in a practice tab';
+      practiceTabButton.title = 'Open a finished example study in a separate practice tab, saved separately from your own study, where the guided walkthrough can run.';
+      practiceTabButton.addEventListener('click', () => onOpenExampleTab(SANDBOX_URL));
+      main.appendChild(practiceTabButton);
+    }
 
     para(
       main,
@@ -18216,7 +18862,7 @@ const guideStep = {
       section(main, 'Getting started', (c) => {
         bullets(c, [
           'Choose “Plan my study” to start your own Study map, or “Explore a completed example” to inspect the oregano plan. The example is not your data.',
-          'Opening the example preserves your current study in Restore before anything changes on screen. Demo activity cannot age that protected copy out of Restore.',
+          'The example opens in a separate practice tab of its own, so the study you are working on is not replaced, moved, or closed -- it stays open in the tab you came from. Close the practice tab when you are done with it.',
           'You do not have to answer everything. Fields you skip are simply marked as not set; ' +
             'the app still produces whatever it can from what you have entered.',
         ]);
@@ -18858,10 +19504,13 @@ function createStudyMap({ store, router, getMap, document: suppliedDocument } = 
 // One big clickable tile: a title, a short line of what it does, and the
 // step it navigates to. Its icon comes from the same thin-stroke SVG system
 // as the shell so the entry point describes the scientific workflow.
-function card(parent, { icon, title, body, onClick }) {
+// `featured` (app.css's .home-card-featured) is the one visual escape hatch
+// from "every tile looks the same" -- used ONLY for the example-study entry
+// below, which used to be a tiny text link a new visitor could miss entirely.
+function card(parent, { icon, title, body, onClick, featured = false }) {
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = 'home-card';
+  button.className = featured ? 'home-card home-card-featured' : 'home-card';
   button.addEventListener('click', onClick);
 
   const iconSpan = document.createElement('span');
@@ -18908,6 +19557,36 @@ function homeGuidedStatus(guidedStatus, getGuidedStatus) {
 // on load. secondaryExplain marks every branch where "Explain Study map"
 // must additionally be offered so it is never lost as a reachable action.
 function homeGuidedEntryForStatus(status, options) {
+  // Checked BEFORE the status ladder, deliberately.
+  //
+  // The walkthrough only ever runs on the example study (ui/steps/guide.js's
+  // Start gate checks the same isExampleOrigin), and the example can now only
+  // be opened in the practice tab (?demo=1) -- openExampleStudy
+  // (core/appController.js) refuses to run outside it.
+  //
+  // An earlier shape of this change gated only 'not-started', which left the
+  // other statuses still offering Continue/Resume/Restart on a study that
+  // never came from the example: a tour OF THE EXAMPLE, reopened over
+  // somebody's own work. Upgrading users really can be in that state, because
+  // the real scope's progress key is the unprefixed one it has always been, so
+  // a walkthrough they left paused before this change survives into a tab the
+  // example is no longer in. One check here covers every status at once.
+  //
+  // `isExample` is threaded in as a plain option (computed once by the caller
+  // from store.get().meta?.origin) rather than this function reaching for the
+  // store or core/appController.js itself, so it stays the pure, directly
+  // testable mapping it has always been.
+  if (!options.isExample) {
+    return {
+      title: 'Try the guided walkthrough',
+      body: 'The walkthrough only runs on the finished example study -- open it in a separate practice tab to try it risk-free.',
+      onClick: () => {
+        const open = typeof options.onOpenExampleTab === 'function' ? options.onOpenExampleTab : openInNewTab;
+        open(SANDBOX_URL);
+      },
+      secondaryExplain: true,
+    };
+  }
   if (status === 'not-started') {
     return {
       title: 'Start example walkthrough',
@@ -19010,22 +19689,51 @@ function appendGuidedEntry(main, options) {
 }
 
 // Also exported for the same direct-test reason as appendGuidedEntry: the
-// "no dead button" contract (row absent without onOpenExample) is cheapest
-// to prove against this function alone.
-function appendExampleLink(main, onOpenExample) {
-  if (typeof onOpenExample !== 'function') return null;
-  return appendLinkRow(
-    main,
-    'Want to see a finished plan? Open the example study.',
-    () => onOpenExample()
-  );
+// "no dead button" contract (row absent without a working opener) is
+// cheapest to prove against this function alone.
+//
+// This USED to be a plain text link (appendLinkRow) sitting quietly below
+// the walkthrough card -- new users found it, if at all, by accident. It is
+// now a featured card in the same .home-grid family as the walkthrough
+// entry, because the example is one of the two things a first-time visitor
+// on this page most needs to find.
+//
+// The click no longer calls back into main.js to swap the in-memory study:
+// opening the example now means opening ui/newTab.js's SANDBOX_URL
+// (?demo=1) in a SEPARATE TAB against its own storage (core/storageScope.js)
+// -- the real tab on screen is never navigated away, so there is nothing
+// here left to preserve/protect/confirm. `onOpenExampleTab` is accepted as a
+// plain callback (not an options object) for exactly the same reason
+// `onOpenExample` used to be: homeStep.render supplies the real opener with
+// its default already applied (openInNewTab), while a test can pass its own
+// spy here directly, following ui/feedbackHandoff.js:111's onOpen precedent.
+function appendExampleLink(main, onOpenExampleTab) {
+  if (typeof onOpenExampleTab !== 'function') return null;
+  const grid = document.createElement('div');
+  grid.className = 'home-grid';
+  const button = card(grid, {
+    icon: 'template',
+    title: 'Explore a completed example',
+    body: 'Opens a finished oregano study in a separate practice tab, saved separately from your work. Nothing you do there changes this study.',
+    onClick: () => onOpenExampleTab(SANDBOX_URL),
+    featured: true,
+  });
+  main.appendChild(grid);
+  return button;
 }
 
 const homeStep = {
   id: 'home',
   title: 'Study map',
   render(main, store, options = {}) {
-    const { router, onOpenExample } = options;
+    // onOpenExampleTab defaults here (not inside appendExampleLink/
+    // appendGuidedEntry) so both stay simple "callback missing => render
+    // nothing" functions, while every real render of this page still gets a
+    // working opener with no wiring required from main.js.
+    // isSandbox injected (defaulting to the real flag) the same way
+    // ui/shell.js takes it, so both branches stay drivable from the DOM
+    // stub without a real location.search to resolve against.
+    const { router, onOpenExampleTab = openInNewTab, isSandbox = IS_SANDBOX } = options;
     main.textContent = '';
     const heading = document.createElement('h1');
     heading.className = 'step-heading';
@@ -19040,12 +19748,36 @@ const homeStep = {
       title: 'Plan my study',
       body: 'This is your workspace. Your map answers are saved here as you plan.',
     });
+    // ABOVE the study map, deliberately. This entry was a text link at the
+    // very bottom of this page and new visitors simply never found it; moving
+    // it into a card was only half the fix, because the map's own question
+    // card is tall enough to push anything below it off the first screen
+    // entirely -- a card nobody scrolls to is no more findable than the link
+    // was. It sits directly under "Plan my study" so the two read as the pair
+    // of choices they actually are: plan your own, or go look at a finished
+    // one. Everything that follows the map stays after the map.
+    // Hidden inside the practice tab itself, where it would invite you to
+    // open a practice tab while you are standing in one, looking at the very
+    // example it offers to show you. Same reasoning as the Utilities menu
+    // item ui/shell.js hides there; this card was missed when that one was
+    // gated, and regenerating the manual's screenshots is what surfaced it --
+    // the card sat in the middle of every practice-tab capture offering the
+    // reader the page they were already on.
+    if (!isSandbox) appendExampleLink(main, onOpenExampleTab);
+
     // This controller owns map input, persistence calls, and deterministic
     // next-decision routing. Home only chooses when the map is revealed.
     main.appendChild(createStudyMap({ store, router }).element);
-    appendGuidedEntry(main, options);
+    // isExample is derived here, once, from the live store -- not inside
+    // homeGuidedEntryForStatus -- so that function stays a pure, directly
+    // testable mapping from (status, options) to an entry (see its own
+    // comment on the 'not-started' branch).
+    appendGuidedEntry(main, {
+      ...options,
+      onOpenExampleTab,
+      isExample: isExampleOrigin(store.get().meta?.origin),
+    });
 
-    appendExampleLink(main, onOpenExample);
     appendLinkRow(main, 'Looking for a specific term or step? See the Guide.', () => {
       if (router) router.navigate('guide');
     });
@@ -22400,13 +23132,19 @@ function settingsButton(label, onClick, className = 'copy-button') { const node 
 
 /**
  * A two-click "are you sure" button, for an action too destructive for the
- * plain window.confirm() used elsewhere in this app (New study / Restore /
- * Reset to example all explicitly say "your current work remains available
- * in Restore" -- clearing storage is the one action that is NOT true for,
- * since it deletes the restore ring itself). There is no confirm-modal
- * framework in this codebase to reach for instead, and this needs no new
- * dependency: the button's own label and class carry the "armed" state, and
- * a timer disarms it if the second click never comes.
+ * plain window.confirm() used elsewhere in this app (New study / Restore
+ * both explicitly say "your current work remains available in Restore" --
+ * clearing storage is the one action that is NOT true for, since it deletes
+ * the restore ring itself). Reset to example used to belong in that same
+ * list -- back when opening the example replaced whatever study was on
+ * screen, its confirm dialog carried the identical promise. Now that opening
+ * the example opens the separate practice tab (?demo=1, core/storageScope.js)
+ * instead, it never touches the study open here at all, so there is nothing
+ * for it to promise about this tab's work and it no longer belongs in this
+ * comparison. There is no confirm-modal framework in this codebase to reach
+ * for instead, and this needs no new dependency: the button's own label and
+ * class carry the "armed" state, and a timer disarms it if the second click
+ * never comes.
  */
 function armedButton(label, armedLabel, onConfirm) {
   const node = document.createElement('button');
@@ -22455,7 +23193,7 @@ const settingsStep = {
     }
     const storageNote = document.createElement('p');
     storageNote.className = 'proposals-empty supporting-description';
-    storageNote.textContent = 'Clearing stored data removes every locally saved version (Restore) and frees up storage space if it is full or corrupted. It does not affect the study currently open — download a project backup first if you want to keep it.';
+    storageNote.textContent = 'Clearing stored data removes every locally saved version (Restore) for this tab and frees up storage space if it is full or corrupted. It does not affect the study currently open — download a project backup first if you want to keep it.';
     const version = document.createElement('p');
     version.className = 'proposals-empty supporting-description';
     version.textContent = `Version ${APP_VERSION}`;
@@ -23384,9 +24122,12 @@ function loadAppKb() {
 // example made a visitor's first workspace someone else's four-measurement
 // study, and an entire ownership subsystem (banners, read-only exploration,
 // "make a copy") existed only to walk that back. The example is still one
-// click away -- see openExampleStudy() (core/appController.js) and Home's
-// "Open the example study" -- but it is now something the visitor asks for
-// rather than something they have to disown.
+// click away -- Home's "Explore a completed example" card -- but it is now
+// something the visitor asks for rather than something they have to disown.
+// That click no longer lands here at all, though: it opens the example in its
+// own PRACTICE TAB (?demo=1, see core/storageScope.js) against a separate set
+// of saved work, so this tab's study is not replaced, and openExampleStudy()
+// (core/appController.js) refuses to run anywhere but that tab.
 
 // Bootstrap, not top-level await -- the single-file inliner forbids
 // top-level await since the released artifact is one classic (non-module,
@@ -23410,14 +24151,29 @@ function init() {
     saveExperiment,
   };
 
+  // A practice tab (?demo=1) resolves against its OWN key set
+  // (core/storageScope.js's nsKey namespaces every key persist.js touches),
+  // so on a first visit that ring is genuinely empty -- there is no autosave
+  // to recover, by construction, not by bug. resolveInitialExperiment's
+  // fallback factory is normally emptyExperiment (a true first run should
+  // start blank), but that would leave the practice tab open on a blank
+  // study with nothing to practise on. Swap in a factory that returns the
+  // shipped example instead, tagged 'template' -- see isExampleOrigin's
+  // long comment (core/appController.js) for why 'template' and not the
+  // older 'example': ui/steps/guide.js's Start button gates on that
+  // predicate, so tagging this wrong would make the walkthrough
+  // unreachable in the very tab that exists to run it.
+  const sandboxFallback = () => withOrigin(createDefaultStudy(), 'template');
+
   const { experiment: initialExperiment, skippedCount, totalSaved, isPersisted } = resolveInitialExperiment(
     persistBundle,
-    emptyExperiment,
+    IS_SANDBOX ? sandboxFallback : emptyExperiment,
     {
       onUnreadable: (id, err) =>
         console.error(`Discarding an unreadable autosave (slot ${id}), trying the next one:`, err),
     }
   );
+
   const store = createStore(initialExperiment);
 
   // The guidedProgress.js bundle handed to appController, same reasoning as
@@ -23443,6 +24199,7 @@ function init() {
     createExampleStudy: createDefaultStudy,
     createEmptyStudy: emptyExperiment,
     isPersisted,
+    isSandbox: IS_SANDBOX,
   });
 
   const kb = loadAppKb();
@@ -23672,7 +24429,22 @@ function init() {
 
   // The one thing allowed to open itself on load, and only because the user
   // explicitly left a walkthrough paused mid-way on a previous visit.
-  if (appController.getGuidedState().status === 'active') guidedController.resume();
+  //
+  // Gated on the study actually being the example, not just on there being an
+  // active record. The walkthrough is a tour OF the example, and the example
+  // now only ever lives in the practice tab -- but a progress record written
+  // before that change survives in the real tab under the same unprefixed key
+  // it has always used. Without this check, upgrading a user who left a
+  // walkthrough running would pop the panel open over their own study on the
+  // next load, narrating steps about a study that is not on screen. Same
+  // predicate ui/steps/guide.js and ui/steps/home.js gate their walkthrough
+  // actions on, so all three agree on when the walkthrough may appear.
+  if (
+    isExampleOrigin(store.get().meta?.origin)
+    && appController.getGuidedState().status === 'active'
+  ) {
+    guidedController.resume();
+  }
 }
 
 init();
